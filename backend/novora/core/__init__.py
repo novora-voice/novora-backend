@@ -11,13 +11,19 @@ from novora.core.models import (
     EvaluationReport,
     EvaluationScenario,
     EvidenceReference,
+    RegressionReport,
+    RuleComparison,
     RuleConfig,
     RuleResult,
+    TelephonyCallRecord,
+    WebhookEventRecord,
 )
 from novora.core.interfaces import (
     EvaluationRepository,
     RuleEvaluatorProtocol,
     ScenarioRepository,
+    TelephonyRepository,
+    WebhookEventRepository,
 )
 
 __all__ = [
@@ -31,9 +37,15 @@ __all__ = [
     "EvaluationReport",
     "EvaluationScenario",
     "EvidenceReference",
+    "RegressionReport",
+    "RuleComparison",
     "RuleConfig",
     "RuleResult",
+    "TelephonyCallRecord",
+    "WebhookEventRecord",
     "EvaluationRepository",
     "RuleEvaluatorProtocol",
     "ScenarioRepository",
+    "TelephonyRepository",
+    "WebhookEventRepository",
 ]

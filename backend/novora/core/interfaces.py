@@ -41,3 +41,28 @@ class EvaluationRepository(Protocol):
 
     def list_by_scenario(self, scenario_id: str, limit: int = 50, offset: int = 0) -> List[EvaluationReport]:
         ...
+
+class TelephonyRepository(Protocol):
+    """Protocol for telephony call records persistence."""
+
+    def save(self, record: "TelephonyCallRecord") -> "TelephonyCallRecord":
+        ...
+
+    def get(self, call_sid: str) -> Optional["TelephonyCallRecord"]:
+        ...
+
+    def list_all(self, limit: int = 50, offset: int = 0) -> List["TelephonyCallRecord"]:
+        ...
+
+class WebhookEventRepository(Protocol):
+    """Protocol for webhook idempotency and audit logs."""
+
+    def record_event(self, event: "WebhookEventRecord") -> "WebhookEventRecord":
+        ...
+
+    def is_processed(self, provider: str, event_id: str) -> bool:
+        ...
+
+    def get(self, event_id: str) -> Optional["WebhookEventRecord"]:
+        ...
+
