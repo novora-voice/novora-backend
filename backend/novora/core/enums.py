@@ -18,6 +18,9 @@ class OverallStatus(str, Enum):
 
 class ConversationSource(str, Enum):
     TRANSCRIPT_UPLOAD = "transcript_upload"
+    ELEVENLABS_WEBHOOK = "elevenlabs_webhook"
+    TWILIO_WEBHOOK = "twilio_webhook"
+    ASSEMBLYAI_WEBHOOK = "assemblyai_webhook"
     VAPI_WEBHOOK = "vapi_webhook"
     RETELL_WEBHOOK = "retell_webhook"
     SYNTHETIC_FIXTURE = "synthetic_fixture"

@@ -107,3 +107,46 @@ class EvaluationReport(BaseModel):
             data["failed_rules"] = failed
             data["inconclusive_rules"] = inconclusive
         return data
+
+class TelephonyCallRecord(BaseModel):
+    id: str = Field(default_factory=lambda: f"tel_{uuid4().hex[:8]}")
+    provider: str = "twilio"
+    call_sid: str
+    from_number: Optional[str] = None
+    to_number: Optional[str] = None
+    call_status: str  # queued, ringing, in-progress, completed, failed, busy, no-answer
+    duration_seconds: Optional[int] = None
+    recording_sid: Optional[str] = None
+    recording_url: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+
+class WebhookEventRecord(BaseModel):
+    id: str = Field(default_factory=lambda: f"evt_{uuid4().hex[:8]}")
+    provider: str  # elevenlabs, twilio, assemblyai
+    event_id: str
+    signature_verified: bool
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    status: str = "processed"  # processed, duplicate, rejected
+    created_at: datetime = Field(default_factory=utc_now)
+
+class RuleComparison(BaseModel):
+    rule_name: str
+    rule_type: RuleType
+    baseline_status: RuleStatus
+    candidate_status: RuleStatus
+    change: str  # "regressed", "improved", "unchanged"
+    explanation_diff: str
+
+class RegressionReport(BaseModel):
+    scenario_id: str
+    baseline_id: str
+    candidate_id: str
+    baseline_status: OverallStatus
+    candidate_status: OverallStatus
+    regression_detected: bool
+    net_status_change: str  # "regressed", "improved", "neutral"
+    rule_comparisons: List[RuleComparison] = Field(default_factory=list)
+    summary: str
+    created_at: datetime = Field(default_factory=utc_now)
+
