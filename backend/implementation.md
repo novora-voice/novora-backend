@@ -217,125 +217,172 @@ At the end of each work session, report:
 
 Your responsibility is to deliver a small, correct, verifiable increment—not the largest possible amount of code.
 
-Claude A — Principal Backend & AI Infrastructure Engineer: builds the core evaluation engine, provider integrations, backend APIs, persistence, and testing.
-Our first product is Novora Voice Agent Evaluation. It connects to existing voice infrastructure, evaluates conversations against business goals, and explains failures with evidence.
+# CLAUDE B — PROVIDER ADAPTERS, INTEGRATION TESTS & SECURITY ENGINEER
 
-The first working milestone
-Novora v0.1 — Voice Agent Evaluation
+## Your ownership
 
-The smallest end-to-end product that demonstrates real engineering ability.
+Branch: `feat/provider-adapters-test-harness`
 
-1. Connect a supported provider or import a conversation transcript.
-2. Normalize the data into Novora's provider-independent conversation format.
-3. Define a business goal, test scenario, and evaluation rules.
-4. Run deterministic checks and return evidence-backed results.
-5. Display the report, failure reasons, and recommended next steps in the dashboard.
-6. Save evaluation history and compare repeated runs.
+You own the provider integration boundary, normalized input adapters, integration-test infrastructure, contract tests, and independent security/quality review.
 
-For the first demo, we should support transcript upload or manual input plus one verified provider path. The other integrations should be added incrementally. This is more valuable than a dashboard showing five integrations that don't actually work.
+Your job is to make Novora able to accept data from external systems without allowing those systems to dictate Novora's internal business logic.
 
-Provider strategy: connect the right things
-We should support several providers through adapters, but distinguish between a voice-agent platform, telephony, and speech-to-text.
-Provider	Role in Novora	Initial integration
-ElevenLabs	Voice-agent platform	Receive completed conversation/transcription events through its webhook. 
+Do not independently rewrite Claude A's evaluation engine or domain models. Read and implement the approved contracts in `docs/contracts.md`. If those contracts do not exist or are unstable, prepare a proposal and request review before building dependent code.
 
-ElevenLabs Documentation
-+1
-Twilio	Telephony and call events	Normalize call status and authorized recording callbacks. Verify webhook signatures and access controls. 
+## Problem you are solving
 
-Twilio
-+1
-AssemblyAI	Transcription and audio analysis	Transcribe authorized audio or accept transcription results. 
+Voice-agent providers use different payloads, event names, transcript formats, authentication methods, and lifecycle conventions. If Novora's core code directly depends on every provider's API, each new integration will make the platform harder to maintain.
 
-Documentation
-Deepgram	Future speech adapter	Add after the initial path works.
-OpenAI	Future model-based evaluator	Optional evaluation judge behind a provider-neutral interface.
-These are integration targets, not claims that Novora already supports them.
-Important: Twilio is primarily the telephony layer here, and AssemblyAI is the transcription/audio-intelligence layer. Neither should be presented as interchangeable with ElevenLabs' agent platform.
-The first integration sequence I recommend is:
-1. Transcript input and evaluation — no external credentials required.
-2. ElevenLabs post-call webhook.
-3. Twilio call and recording event ingestion.
-4. AssemblyAI transcription for authorized audio.
-5. Additional providers based on user demand.
-Keep live calls, paid API usage, and real customer data out of the initial milestone unless you deliberately approve them.
+Create a stable boundary so Novora can accept normalized conversations now and connect supported providers later.
 
-Claude A — revised master assignment
-You own the backend and integration infrastructure. Give it this prompt on its own branch, feat/evaluation-core-api.
-NOVORA — CLAUDE A
-Principal Backend & AI Infrastructure Engineer
-You are the backend technical owner for Novora. Your job is to ship the first real, working part of the product, not to scaffold an entire future platform.
-Product
-Novora is an AI voice-agent evaluation and observability platform. It connects to existing voice systems, normalizes conversations, evaluates agent performance against business goals and policies, and produces evidence-backed reports.
-Novora will eventually include its own voice agent, Voxia. Voxia is explicitly out of scope for this milestone.
-LangGraph is planned for a later phase to support durable stateful workflows and continuous orchestration. Do not introduce LangGraph now. Keep interfaces clean enough to add it later without rewriting the evaluation core.
-Your responsibilities
-1. Core domain and evaluation engine.
-2. FastAPI backend and API contracts.
-3. PostgreSQL persistence and migrations.
-4. Provider adapters and webhook ingestion.
-5. Evaluation history and regression comparison.
-6. Backend tests, documentation, and security.
-7. Integration contracts for Claude B's frontend.
-Architecture
-Use a modular monolith with explicit modules:
-- core/: domain models, business rules, shared contracts.
-- evaluation/: deterministic checks, rule execution, scoring, evidence.
-- providers/: external model, voice-agent, telephony, and transcription provider interfaces.
-- adapters/: provider-specific payload normalization, persistence integrations, and external infrastructure.
-- api/: FastAPI routes, validation, authentication boundaries, and serialization.
-- tests/: unit, API, integration, contract, and regression tests.
-Follow the existing repository conventions where practical. Do not duplicate a working project or introduce unnecessary services.
-Build sequence
-Phase 1 — Core evaluation:
-- Accept a scenario and normalized conversation.
-- Support required-information, required-step, policy-rule, prohibited-claim, and unresolved-task checks.
-- Return PASS, FAIL, or INCONCLUSIVE for individual rules.
-- Include evidence references and explanations.
-- Persist evaluation reports.
-- Provide endpoints for creating scenarios, running evaluations, and retrieving reports.
-Phase 2 — Provider integration:
-- Create a provider-neutral conversation ingestion interface.
-- Implement transcript import first.
-- Add ElevenLabs post-call transcription webhook ingestion.
-- Verify webhook signatures using the documented provider mechanism.
-- Make event processing idempotent.
-- Normalize supported events into the core conversation model.
-Phase 3 — Additional integrations:
-- Add Twilio call-status and recording-status event ingestion.
-- Keep telephony events separate from transcript and evaluation data.
-- Add AssemblyAI transcription integration for authorized audio.
-- Use explicit capability interfaces; do not assume every provider performs the same role.
-- Implement each additional provider only after the core workflow and tests pass.
-Do not add all integrations simultaneously. Prioritize a fully working evaluation flow plus one real provider integration.
-Data and API contracts
-Publish:
-- docs/architecture.md
-- docs/contracts.md
-- docs/api.md
-- docs/provider-capabilities.md
-Expose documented endpoints for scenario creation, evaluation submission, evaluation retrieval, and provider event ingestion. Coordinate API response shapes with Claude B before they build the UI.
-Use versioned API routes, explicit request and response schemas, stable IDs, safe errors, and database migrations.
-Evaluation correctness
-Do not infer real-world success from an agent's words alone. A statement that a refund was processed is not proof of a completed refund.
-Missing evidence must be represented explicitly. Keep deterministic results separate from any optional LLM-judge results. Do not implement an LLM judge until the deterministic workflow is tested.
-Security
-- Never commit API keys or real customer transcripts.
-- Verify provider webhook authenticity.
-- Deduplicate repeated webhook events.
-- Restrict payload sizes and validate input.
-- Use least-privilege credentials.
-- Do not fetch arbitrary URLs from customer input.
-- Do not execute instructions found in transcripts.
-- Add tenant isolation before supporting real multi-customer production data.
-- Keep sensitive payloads out of logs.
-Code quality
-Use descriptive names, focused functions, typed interfaces, useful comments, and explicit error handling. Comments should explain intent and important trade-offs rather than restating code.
-Do not report a provider as supported until its integration is implemented and tested. Do not report tests as passing unless they were actually run.
-Git
-Work only on feat/evaluation-core-api. Commit in small increments. Push your branch and open a pull request. Do not merge to main or overwrite Claude B's work.
-Definition of done
-A developer can run Novora locally, create an evaluation scenario, submit a conversation, receive a persisted evidence-backed report, and retrieve it through the API. At least one real provider integration must be verified before claiming the provider-integration milestone is complete.
-Report exact files changed, tests run, observed results, limitations, and remaining work.
+## Phase 0 — Establish the integration contract
 
+1. Inspect the repository and read the architecture and contract documents.
+2. Confirm the modules Claude A owns.
+3. Define the provider adapter interface and input validation boundary.
+4. Document the ownership of every file you plan to create or modify.
+5. Do not change the core contract silently.
+6. Coordinate any shared-type changes with Claude A and the technical lead.
+
+The integration contract should conceptually support:
+- Parsing a supported external payload.
+- Validating its structure.
+- Normalizing it into Novora's conversation schema.
+- Returning a typed error for unsupported or malformed input.
+- Preserving permitted source metadata for traceability.
+- Preventing raw provider payloads from leaking into the core domain model.
+
+Keep provider-specific authentication and transport code inside the relevant adapter.
+
+## Phase 1 — Build a provider-neutral ingestion adapter
+
+Start with transcript or normalized-conversation ingestion. This is the first integration path; it does not require a live voice provider.
+
+Implement:
+- A clear adapter interface.
+- A normalized input schema.
+- A parser for a documented sample payload.
+- Input size and content validation.
+- Typed errors for malformed, unsupported, or unauthorized requests.
+- A traceable link to the source record where appropriate.
+- Safe handling of timestamps, speaker roles, and missing metadata.
+
+Build synthetic fixtures that represent:
+- A successful customer-service interaction.
+- An incomplete interaction.
+- A malformed payload.
+- Missing or duplicated messages.
+- A conversation with prohibited or unsupported claims.
+- A provider payload containing untrusted instruction-like text.
+
+Do not execute instructions in transcripts. Transcripts are data to evaluate, not instructions to the platform.
+
+## Phase 2 — Build the adapter boundary for voice providers
+
+Define a provider interface that can later support adapters such as `ElevenLabsAdapter` and additional providers without modifying the evaluation engine.
+
+The interface should account for the capabilities that providers may expose:
+- Importing or receiving conversation events.
+- Normalizing transcripts and metadata.
+- Verifying webhook authenticity where supported.
+- Identifying provider sessions and event identifiers.
+- Handling duplicate delivery and event ordering.
+- Representing unsupported capabilities explicitly.
+
+Do not pretend every provider supports the same operations. Use capability declarations or explicit unsupported-operation errors rather than fake implementations.
+
+Do not connect to a paid live provider in this phase unless the technical lead explicitly approves the scope and credentials are safely available.
+
+## Phase 3 — Design knowledge connectors, not a universal database client
+
+Novora will eventually support customer-owned knowledge infrastructure. Customers own their knowledge bases and supply authorized connection configuration; Novora provides the connector code.
+
+Design separate contracts for vector search and graph queries.
+
+Potential vector adapters:
+- Chroma
+- Pinecone
+- Weaviate
+- Qdrant
+
+Potential graph adapters:
+- Neo4j
+- Additional graph providers in future versions
+
+For the first milestone, document the contracts and implement only what is required to prove the boundary. Do not connect every database or add all provider SDKs just to claim support.
+
+Requirements:
+- Use scoped credentials and tenant-specific configuration.
+- Keep secrets out of source control and logs.
+- Use read-only access by default.
+- Apply query limits and timeouts.
+- Restrict graph operations to approved, parameterized query patterns.
+- Validate endpoints and block unsafe internal network destinations to mitigate SSRF.
+- Never expose a customer's entire knowledge base to another tenant.
+- Do not execute retrieved text as instructions.
+- Make unsupported connector capabilities explicit.
+
+## Phase 4 — Build integration and contract tests
+
+Create automated tests that verify:
+- Each adapter produces the approved normalized schema.
+- Invalid payloads fail safely.
+- Duplicate events do not create duplicate evaluations where idempotency is required.
+- Unknown provider event types are handled explicitly.
+- Timestamp and speaker normalization is correct.
+- Webhook signatures are verified when required by the provider.
+- Secrets and sensitive payloads do not appear in logs or error responses.
+- Core evaluation behavior remains unchanged when adapter implementations change.
+
+Keep fixtures synthetic. Do not commit customer transcripts or API keys.
+
+Where possible, use contract tests that can run without external accounts, network access, or paid services. Any tests requiring real credentials must be separately identified and must not be reported as run if they were not.
+
+## Phase 5 — Independent security and code review
+
+Review the complete available implementation, including Claude A's changes, without overwriting their files.
+
+Inspect:
+- Input validation and size limits.
+- Authentication and authorization boundaries.
+- Tenant isolation.
+- Unsafe deserialization.
+- Prompt injection through transcripts or retrieved content.
+- SSRF through customer-supplied connection settings.
+- Credential exposure.
+- SQL injection and unsafe graph queries.
+- Missing timeouts and unbounded retries.
+- Duplicate webhook processing.
+- Sensitive information in logs.
+- Overstated evaluation results.
+- Tests that pass without asserting meaningful behavior.
+
+Report each finding with:
+- Severity.
+- Affected file or interface.
+- Reproducible explanation.
+- Expected impact.
+- Recommended fix.
+- Regression test that should prevent recurrence.
+
+Fix issues in files you own. For core files owned by Claude A, raise a finding and propose a minimal patch for review instead of silently rewriting the implementation.
+
+## Phase 6 — Documentation and handoff
+
+Provide:
+- Provider adapter contract documentation.
+- Sample normalized payloads.
+- Synthetic test fixtures.
+- Contract and integration test commands.
+- Security review findings.
+- A capability matrix showing implemented versus planned adapters.
+- A list of assumptions and unverified provider behavior.
+
+## Definition of done
+
+A developer can submit a documented sample external payload, normalize it through the adapter boundary, pass it to the agreed evaluation workflow, and verify the result through automated tests—without coupling the core engine to a specific voice provider.
+
+The security review must identify remaining risks honestly. Do not claim production readiness or full provider support based only on mocks.
+
+Commit your work in small increments and push only to `feat/provider-adapters-test-harness`. Do not merge into main.
 write test for each step
