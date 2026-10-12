@@ -1,3 +1,4 @@
+from novora.evaluation.comparator import EvaluationComparator
 from novora.evaluation.engine import EvaluationEngine
 from novora.evaluation.rules import (
     BaseRule,
@@ -11,6 +12,7 @@ from novora.evaluation.rules import (
 
 __all__ = [
     "EvaluationEngine",
+    "EvaluationComparator",
     "BaseRule",
     "PolicyComplianceRule",
     "ProhibitedClaimsRule",
