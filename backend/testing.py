@@ -6,7 +6,10 @@ import json
 from novora.core.enums import MessageRole
 from novora.core.models import Conversation, ConversationMessage
 from novora.evaluation.engine import EvaluationEngine
-from backend.tests.test_delayed_refund_workflow import create_delayed_refund_scenario
+try:
+    from tests.test_delayed_refund_workflow import create_delayed_refund_scenario
+except ModuleNotFoundError:
+    from backend.tests.test_delayed_refund_workflow import create_delayed_refund_scenario
 
 def run_demo():
     print("=" * 70)
