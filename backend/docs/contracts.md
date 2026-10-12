@@ -192,3 +192,68 @@ Returns `EvaluationReport`.
 
 ### `GET /api/v1/evaluations/{evaluation_id}`
 Retrieves a previously computed evaluation report.
+
+### `POST /api/v1/evaluations/compare`
+Compares two evaluation runs (baseline vs candidate) to detect regressions or improvements.
+
+---
+
+## 4. Telephony & Webhook Event Contracts
+
+### 4.1 TelephonyCallRecord
+Isolates telephony events (Twilio) from conversation transcripts.
+
+```python
+class TelephonyCallRecord(BaseModel):
+    id: str = Field(description="Unique record ID, e.g. tel_100")
+    provider: str = "twilio"
+    call_sid: str
+    from_number: Optional[str] = None
+    to_number: Optional[str] = None
+    call_status: str  # queued, ringing, in-progress, completed, failed, busy, no-answer
+    duration_seconds: Optional[int] = None
+    recording_sid: Optional[str] = None
+    recording_url: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+```
+
+### 4.2 WebhookEventRecord
+Audit and idempotency log for incoming provider webhooks.
+
+```python
+class WebhookEventRecord(BaseModel):
+    id: str
+    provider: str  # elevenlabs, twilio, assemblyai
+    event_id: str  # provider event identifier for deduplication
+    signature_verified: bool
+    payload: Dict[str, Any]
+    status: str  # processed, duplicate, rejected
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+```
+
+### 4.3 RegressionReport
+Diff report between baseline and candidate evaluation runs on the same scenario.
+
+```python
+class RuleComparison(BaseModel):
+    rule_name: str
+    rule_type: RuleType
+    baseline_status: RuleStatus
+    candidate_status: RuleStatus
+    change: str  # "regressed", "improved", "unchanged"
+    explanation_diff: str
+
+class RegressionReport(BaseModel):
+    scenario_id: str
+    baseline_id: str
+    candidate_id: str
+    baseline_status: OverallStatus
+    candidate_status: OverallStatus
+    regression_detected: bool
+    net_status_change: str  # "regressed", "improved", "neutral"
+    rule_comparisons: List[RuleComparison]
+    summary: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+```
+
