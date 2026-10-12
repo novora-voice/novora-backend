@@ -1,0 +1,5 @@
+{
+  "conversation_id": "conv_fixture_malformed",
+  "missing_messages_key": true,
+  "data": "corrupted"
+}

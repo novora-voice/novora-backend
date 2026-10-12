@@ -1,0 +1,49 @@
+{
+  "conversation_id": "conv_fixture_success_01",
+  "scenario_id": "scen_refund_01",
+  "messages": [
+    {
+      "id": "f_msg_01",
+      "role": "agent",
+      "sequence": 0,
+      "content": "Hello! Welcome to Novora Support. How can I assist you today?",
+      "timestamp": "2026-10-12T10:00:00Z"
+    },
+    {
+      "id": "f_msg_02",
+      "role": "customer",
+      "sequence": 1,
+      "content": "Hi, I am calling regarding my delayed refund for order #9821. My email is alex@novora.test.",
+      "timestamp": "2026-10-12T10:00:15Z"
+    },
+    {
+      "id": "f_msg_03",
+      "role": "agent",
+      "sequence": 2,
+      "content": "Thank you for verifying Alex. Let me check your order details right away.",
+      "timestamp": "2026-10-12T10:00:30Z"
+    },
+    {
+      "id": "f_msg_04",
+      "role": "agent",
+      "sequence": 3,
+      "content": "I see the delay is due to bank backlog. As an apology, I can provide a $25 store credit.",
+      "timestamp": "2026-10-12T10:00:50Z"
+    },
+    {
+      "id": "f_msg_05",
+      "role": "agent",
+      "sequence": 4,
+      "content": "I have created case ticket #REF-4092 for you. Have a great day!",
+      "timestamp": "2026-10-12T10:01:10Z"
+    },
+    {
+      "id": "f_msg_06",
+      "role": "customer",
+      "sequence": 5,
+      "content": "Thank you so much, that solves it!",
+      "timestamp": "2026-10-12T10:01:25Z"
+    }
+  ],
+  "trusted_action_records": []
+}
