@@ -55,11 +55,11 @@ Novora follows a **modular monolith** design pattern with strict package separat
 | Module | Responsibility | Ownership |
 | :--- | :--- | :--- |
 | `novora.core` | Domain entities, enums, value objects, domain interfaces, business rules. | Claude A |
-| `novora.evaluation` | Deterministic rule engine, evidence collectors, rule scorers, orchestrator. | Claude A |
-| `novora.adapters` | Storage repository interfaces and concrete implementations (in-memory, database). | Claude A |
-| `novora.api` | FastAPI application, route controllers, schemas, dependency injection. | Claude A |
-| `novora.providers` | Adapters for third-party voice providers (Vapi, Retell, Twilio) & LLM judge interfaces. | Claude B |
-| `novora.runtime` | Stateful runtime, real-time audio streams, live tool calling, handoffs. | Future Phase |
+| `novora.evaluation` | Deterministic rule engine, evidence collectors, rule scorers, regression diff comparator. | Claude A |
+| `novora.providers` | Capability protocols for voice-agent platforms, telephony, and transcription providers. | Claude A |
+| `novora.adapters` | Provider payload normalizers (ElevenLabs, Twilio, AssemblyAI, transcript import), storage repositories. | Claude A |
+| `novora.api` | FastAPI application, route controllers, schemas, webhooks, dependency injection. | Claude A |
+| `novora.runtime` | Stateful runtime, live audio streaming, handoffs (Voxia — deferred to later milestone). | Future Phase |
 
 ---
 
