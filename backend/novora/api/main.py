@@ -13,6 +13,7 @@ from novora.api.schemas import (
 from novora.core.models import EvaluationScenario, RuleConfig
 from novora.evaluation.engine import EvaluationEngine
 
+
 def create_app(
     scenario_repo: Optional[InMemoryScenarioRepository] = None,
     evaluation_repo: Optional[InMemoryEvaluationRepository] = None,
@@ -90,7 +91,9 @@ def create_app(
         status_code=status.HTTP_201_CREATED,
         tags=["Evaluations"],
     )
-    def evaluate_conversation(req: EvaluateConversationRequest) -> EvaluationReportResponse:
+    def evaluate_conversation(
+        req: EvaluateConversationRequest,
+    ) -> EvaluationReportResponse:
         scenario = scenarios.get(req.scenario_id)
         if not scenario:
             raise HTTPException(
@@ -126,10 +129,15 @@ def create_app(
         limit: int = Query(default=50, ge=1, le=100),
         offset: int = Query(default=0, ge=0),
     ) -> List[EvaluationReportResponse]:
-        reports = evaluations.list_by_scenario(scenario_id=scenario_id, limit=limit, offset=offset)
-        return [EvaluationReportResponse.model_validate(r.model_dump()) for r in reports]
+        reports = evaluations.list_by_scenario(
+            scenario_id=scenario_id, limit=limit, offset=offset
+        )
+        return [
+            EvaluationReportResponse.model_validate(r.model_dump()) for r in reports
+        ]
 
     return app
+
 
 # Default ASGI app instance
 app = create_app()

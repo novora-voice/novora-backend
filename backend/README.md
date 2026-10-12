@@ -49,8 +49,12 @@ All tests execute in < 1 second.
 Launch the local development server:
 
 ```bash
-uvicorn novora.api.main:app --reload --port 8000
+python -m uvicorn novora.api.main:app --app-dir . --reload --port 8000
 ```
+
+Run this command from the `backend` directory. The import target must be
+`novora.api.main:app`; `api.main:app` is not a valid module path for this project.
+If launching from the repository root instead, use `--app-dir backend`.
 
 Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
 
