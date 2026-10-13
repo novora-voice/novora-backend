@@ -1,0 +1,25 @@
+{
+  "conversation_id": "conv_fixture_incomplete_02",
+  "scenario_id": "scen_refund_01",
+  "messages": [
+    {
+      "id": "f_msg_01",
+      "role": "agent",
+      "sequence": 0,
+      "content": "Hello! Welcome to support."
+    },
+    {
+      "id": "f_msg_02",
+      "role": "customer",
+      "sequence": 1,
+      "content": "Hello? I have been waiting for someone to help me with order #9821."
+    },
+    {
+      "id": "f_msg_03",
+      "role": "customer",
+      "sequence": 2,
+      "content": "Wait, nobody answered and you didn't help me at all!"
+    }
+  ],
+  "trusted_action_records": []
+}

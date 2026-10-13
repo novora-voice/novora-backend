@@ -1,0 +1,23 @@
+{
+  "conversation_id": "conv_fixture_dup_seq",
+  "messages": [
+    {
+      "id": "m1",
+      "role": "customer",
+      "sequence": 1,
+      "content": "First utterance with sequence 1"
+    },
+    {
+      "id": "m2",
+      "role": "agent",
+      "sequence": 1,
+      "content": "Duplicate sequence 1 from agent"
+    },
+    {
+      "id": "m3",
+      "role": "customer",
+      "sequence": 0,
+      "content": "Out of order sequence 0"
+    }
+  ]
+}

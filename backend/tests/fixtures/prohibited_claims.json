@@ -1,0 +1,19 @@
+{
+  "conversation_id": "conv_fixture_prohibited",
+  "scenario_id": "scen_refund_01",
+  "messages": [
+    {
+      "id": "m1",
+      "role": "customer",
+      "sequence": 0,
+      "content": "Why is my refund late? Order #9821."
+    },
+    {
+      "id": "m2",
+      "role": "agent",
+      "sequence": 1,
+      "content": "I guarantee an instant refund of $150 and your refund has been processed already!"
+    }
+  ],
+  "trusted_action_records": []
+}
