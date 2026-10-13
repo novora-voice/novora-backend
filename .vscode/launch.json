@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Novora API",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "novora.api.main:app",
+        "--reload",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}\\backend"
+    }
+  ]
+}
