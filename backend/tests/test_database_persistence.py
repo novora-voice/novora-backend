@@ -15,6 +15,13 @@ from novora.core.models import (
     WebhookEventRecord,
 )
 
+def test_database_session_manager_uses_environment_url(monkeypatch):
+    monkeypatch.setenv("NOVORA_DATABASE_URL", "sqlite:///:memory:")
+
+    session_manager = DatabaseSessionManager()
+
+    assert session_manager.engine.dialect.name == "sqlite"
+
 def test_sqlalchemy_scenario_repository():
     sm = DatabaseSessionManager("sqlite:///:memory:")
     repo = SQLAlchemyScenarioRepository(sm)

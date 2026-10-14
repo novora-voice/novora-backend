@@ -1,6 +1,9 @@
 import json
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
 from sqlalchemy import (
     Boolean,
     Column,
@@ -20,6 +23,9 @@ from novora.core.models import (
     TelephonyCallRecord,
     WebhookEventRecord,
 )
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(BACKEND_ROOT / ".env")
 
 Base = declarative_base()
 
@@ -75,8 +81,13 @@ class DBWebhookEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class DatabaseSessionManager:
-    def __init__(self, db_url: str = "sqlite:///:memory:") -> None:
-        self.engine = create_engine(db_url, connect_args={"check_same_thread": False} if "sqlite" in db_url else {})
+    def __init__(self, db_url: Optional[str] = None) -> None:
+        db_url = db_url or os.getenv("NOVORA_DATABASE_URL", "sqlite:///:memory:")
+        self.engine = create_engine(
+            db_url,
+            connect_args={"check_same_thread": False} if db_url.startswith("sqlite:") else {},
+            pool_pre_ping=True,
+        )
         Base.metadata.create_all(bind=self.engine)
         self.session_factory = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
@@ -303,4 +314,3 @@ class SQLAlchemyWebhookEventRepository:
                 status=row.status,
                 created_at=row.created_at,
             )
-

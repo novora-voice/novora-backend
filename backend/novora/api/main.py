@@ -1,14 +1,43 @@
+import os
+import secrets
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
+from novora.api.auth import (
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE_SECONDS,
+    AuthStore,
+    AuthUserResponse,
+    AuthenticatedUser,
+    LoginRequest,
+    SignupRequest,
+    hash_password,
+    require_authenticated_user,
+    session_token_hash,
+    verify_password,
+)
 from novora.adapters.providers.assemblyai import AssemblyAIAdapter
 from novora.adapters.providers.elevenlabs import ElevenLabsAdapter
 from novora.adapters.providers.transcript_importer import TranscriptImporter
 from novora.adapters.providers.twilio import TwilioAdapter
+from novora.adapters.database import (
+    DatabaseSessionManager,
+    SQLAlchemyEvaluationRepository,
+    SQLAlchemyScenarioRepository,
+    SQLAlchemyTelephonyRepository,
+    SQLAlchemyWebhookEventRepository,
+)
 from novora.adapters.repositories import (
     InMemoryEvaluationRepository,
     InMemoryScenarioRepository,
     InMemoryTelephonyRepository,
     InMemoryWebhookEventRepository,
+)
+from novora.core.interfaces import (
+    EvaluationRepository,
+    ScenarioRepository,
+    TelephonyRepository,
+    WebhookEventRepository,
 )
 from novora.api.schemas import (
     CompareEvaluationsRequest,
@@ -21,16 +50,17 @@ from novora.api.schemas import (
     ScenarioResponse,
     TelephonyCallResponse,
 )
-from novora.core.models import EvaluationScenario, RuleConfig, WebhookEventRecord
+from novora.core.models import EvaluationScenario, RuleConfig
 from novora.evaluation.comparator import EvaluationComparator
 from novora.evaluation.engine import EvaluationEngine
 
 def create_app(
-    scenario_repo: Optional[InMemoryScenarioRepository] = None,
-    evaluation_repo: Optional[InMemoryEvaluationRepository] = None,
-    telephony_repo: Optional[InMemoryTelephonyRepository] = None,
-    webhook_repo: Optional[InMemoryWebhookEventRepository] = None,
+    scenario_repo: Optional[ScenarioRepository] = None,
+    evaluation_repo: Optional[EvaluationRepository] = None,
+    telephony_repo: Optional[TelephonyRepository] = None,
+    webhook_repo: Optional[WebhookEventRepository] = None,
     evaluation_engine: Optional[EvaluationEngine] = None,
+    auth_store: Optional[AuthStore] = None,
     elevenlabs_secret: str = "test_elevenlabs_secret",
     twilio_auth_token: str = "test_twilio_auth_token",
 ) -> FastAPI:
@@ -46,10 +76,107 @@ def create_app(
     telephony = telephony_repo or InMemoryTelephonyRepository()
     webhooks = webhook_repo or InMemoryWebhookEventRepository()
     engine = evaluation_engine or EvaluationEngine()
+    authentication = auth_store or AuthStore()
+    secure_auth_cookie = os.getenv("NOVORA_AUTH_COOKIE_SECURE", "false").lower() == "true"
 
     el_adapter = ElevenLabsAdapter(webhook_repo=webhooks)
     tw_adapter = TwilioAdapter()
     aai_adapter = AssemblyAIAdapter()
+
+    def get_authenticated_user(request: Request) -> AuthenticatedUser:
+        return require_authenticated_user(request, authentication)
+
+    def set_auth_cookie(response: Response, user: AuthenticatedUser) -> None:
+        token = secrets.token_urlsafe(32)
+        expires_at = int(datetime.now(timezone.utc).timestamp()) + SESSION_MAX_AGE_SECONDS
+        authentication.create_session(user.id, session_token_hash(token), expires_at)
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=token,
+            max_age=SESSION_MAX_AGE_SECONDS,
+            httponly=True,
+            secure=secure_auth_cookie,
+            samesite="lax",
+            path="/",
+        )
+
+    @app.post(
+        "/api/v1/auth/signup",
+        response_model=AuthUserResponse,
+        status_code=status.HTTP_201_CREATED,
+        tags=["Authentication"],
+    )
+    def signup(req: SignupRequest, response: Response) -> AuthUserResponse:
+        user = authentication.create_user(
+            email=req.email,
+            full_name=req.full_name,
+            password_hash=hash_password(req.password),
+        )
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
+        set_auth_cookie(response, user)
+        return AuthUserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at,
+        )
+
+    @app.post(
+        "/api/v1/auth/login",
+        response_model=AuthUserResponse,
+        tags=["Authentication"],
+    )
+    def login(req: LoginRequest, response: Response) -> AuthUserResponse:
+        user = authentication.get_user_by_email(req.email)
+        password_is_valid = verify_password(
+            req.password,
+            user.password_hash if user is not None else None,
+        )
+        if user is None or not password_is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password.",
+            )
+        set_auth_cookie(response, user)
+        return AuthUserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at,
+        )
+
+    @app.get(
+        "/api/v1/auth/me",
+        response_model=AuthUserResponse,
+        tags=["Authentication"],
+    )
+    def get_current_user(
+        user: AuthenticatedUser = Depends(get_authenticated_user),
+    ) -> AuthUserResponse:
+        return AuthUserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at,
+        )
+
+    @app.post("/api/v1/auth/logout", tags=["Authentication"])
+    def logout(request: Request, response: Response) -> Dict[str, str]:
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        if token:
+            authentication.delete_session(session_token_hash(token))
+        response.delete_cookie(
+            key=SESSION_COOKIE_NAME,
+            path="/",
+            secure=secure_auth_cookie,
+            httponly=True,
+            samesite="lax",
+        )
+        return {"status": "ok"}
 
     @app.get("/health", tags=["Health"])
     def health_check():
@@ -63,6 +190,7 @@ def create_app(
         response_model=ScenarioResponse,
         status_code=status.HTTP_201_CREATED,
         tags=["Scenarios"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def create_scenario(req: CreateScenarioRequest) -> ScenarioResponse:
         rules = [
@@ -87,6 +215,7 @@ def create_app(
         "/api/v1/scenarios/{scenario_id}",
         response_model=ScenarioResponse,
         tags=["Scenarios"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def get_scenario(scenario_id: str) -> ScenarioResponse:
         scenario = scenarios.get(scenario_id)
@@ -101,6 +230,7 @@ def create_app(
         "/api/v1/scenarios",
         response_model=List[ScenarioResponse],
         tags=["Scenarios"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def list_scenarios(
         limit: int = Query(default=50, ge=1, le=100),
@@ -117,6 +247,7 @@ def create_app(
         response_model=EvaluationReportResponse,
         status_code=status.HTTP_201_CREATED,
         tags=["Evaluations"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def evaluate_conversation(
         req: EvaluateConversationRequest,
@@ -136,6 +267,7 @@ def create_app(
         "/api/v1/evaluations/{evaluation_id}",
         response_model=EvaluationReportResponse,
         tags=["Evaluations"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def get_evaluation_report(evaluation_id: str) -> EvaluationReportResponse:
         report = evaluations.get(evaluation_id)
@@ -150,6 +282,7 @@ def create_app(
         "/api/v1/evaluations",
         response_model=List[EvaluationReportResponse],
         tags=["Evaluations"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def list_evaluation_reports(
         scenario_id: str = Query(..., description="Filter reports by scenario ID"),
@@ -167,6 +300,7 @@ def create_app(
         "/api/v1/scenarios/{scenario_id}/history",
         response_model=List[EvaluationReportResponse],
         tags=["Evaluations"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def get_scenario_evaluation_history(
         scenario_id: str,
@@ -190,6 +324,7 @@ def create_app(
         "/api/v1/evaluations/compare",
         response_model=RegressionReportResponse,
         tags=["Evaluations"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def compare_evaluation_runs(
         req: CompareEvaluationsRequest,
@@ -217,6 +352,7 @@ def create_app(
         "/api/v1/conversations/import-transcript",
         response_model=ConversationResponse,
         tags=["Ingestion"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def import_transcript(req: ImportTranscriptRequest) -> ConversationResponse:
         if req.text:
@@ -347,6 +483,7 @@ def create_app(
         "/api/v1/telephony/calls",
         response_model=List[TelephonyCallResponse],
         tags=["Telephony"],
+        dependencies=[Depends(get_authenticated_user)],
     )
     def list_telephony_calls(
         limit: int = Query(default=50, ge=1, le=100),
@@ -357,5 +494,11 @@ def create_app(
 
     return app
 
-# Default ASGI app instance
-app = create_app()
+# The ASGI application persists dashboard data in the configured database.
+database_session_manager = DatabaseSessionManager()
+app = create_app(
+    scenario_repo=SQLAlchemyScenarioRepository(database_session_manager),
+    evaluation_repo=SQLAlchemyEvaluationRepository(database_session_manager),
+    telephony_repo=SQLAlchemyTelephonyRepository(database_session_manager),
+    webhook_repo=SQLAlchemyWebhookEventRepository(database_session_manager),
+)

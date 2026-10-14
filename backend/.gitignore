@@ -2,9 +2,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.pytest_cache/
 .coverage
 htmlcov/
 *.egg-info/
+*.sqlite3*
 dist/
 build/
 .env
@@ -15,3 +17,4 @@ venv/
 vscode/
 .implementation.py
 implementation.py
+env.example/

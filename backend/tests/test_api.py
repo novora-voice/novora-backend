@@ -1,12 +1,22 @@
 import pytest
 from fastapi.testclient import TestClient
+from novora.api.auth import AuthStore
 from novora.api.main import create_app
 from novora.core.enums import MessageRole, OverallStatus, RuleType
 
 @pytest.fixture
-def client():
-    app = create_app()
-    return TestClient(app)
+def client(tmp_path):
+    test_client = TestClient(create_app(auth_store=AuthStore(tmp_path / "auth.sqlite3")))
+    signup = test_client.post(
+        "/api/v1/auth/signup",
+        json={
+            "full_name": "API Test User",
+            "email": "api-test@example.com",
+            "password": "correct-horse-battery",
+        },
+    )
+    assert signup.status_code == 201
+    return test_client
 
 def test_health_check(client):
     res = client.get("/health")

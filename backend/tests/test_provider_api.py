@@ -3,13 +3,29 @@ import hmac
 import time
 import pytest
 from fastapi.testclient import TestClient
+from novora.api.auth import AuthStore
 from novora.api.main import create_app
 from novora.core.enums import OverallStatus, RuleType
 
 @pytest.fixture
-def client():
-    app = create_app(elevenlabs_secret="test_secret_key", twilio_auth_token="test_twilio_token")
-    return TestClient(app)
+def client(tmp_path):
+    test_client = TestClient(
+        create_app(
+            auth_store=AuthStore(tmp_path / "auth.sqlite3"),
+            elevenlabs_secret="test_secret_key",
+            twilio_auth_token="test_twilio_token",
+        )
+    )
+    signup = test_client.post(
+        "/api/v1/auth/signup",
+        json={
+            "full_name": "Provider API User",
+            "email": "provider-api@example.com",
+            "password": "correct-horse-battery",
+        },
+    )
+    assert signup.status_code == 201
+    return test_client
 
 def test_api_import_transcript_endpoint(client):
     res = client.post(

@@ -56,6 +56,14 @@ All 36 tests execute and pass cleanly.
 
 ## 3. Running the REST API
 
+Set `NOVORA_DATABASE_URL` in `backend/.env` to configure the SQLAlchemy
+repositories. For local PostgreSQL, use the `postgresql+psycopg` scheme and
+your database credentials; `.env` is ignored by Git. The default ASGI app uses
+this URL for scenarios, evaluations, telephony calls, and webhook events.
+`DatabaseSessionManager` uses this setting when no URL is passed explicitly.
+SQLite in-memory URLs can still be passed directly for tests. Account and
+session data remains in its separate SQLite auth store.
+
 Launch the local development server:
 
 ```bash
@@ -64,6 +72,27 @@ python -m uvicorn novora.api.main:app --app-dir . --reload --port 8000
 ```
 
 Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
+
+### Account Authentication
+
+The dashboard supports email/password account creation and login. Accounts and
+server-side sessions are stored in `backend/.novora-auth.sqlite3` by default;
+set `NOVORA_AUTH_DB_PATH` to choose a different database path. The backend
+issues a seven-day, HTTP-only, same-site session cookie and protects dashboard
+scenario, evaluation, transcript-import, comparison, and telephony-list routes.
+Provider webhooks remain available to external providers and retain their
+provider-specific verification behavior.
+
+Set `NOVORA_AUTH_COOKIE_SECURE=true` when serving the backend over HTTPS.
+For local development, leave it unset. `/health`, signup, login, and logout
+remain public; `/api/v1/auth/me` returns the current user for an active session.
+
+Authentication endpoints:
+
+- `POST /api/v1/auth/signup` — Create an account and start a session.
+- `POST /api/v1/auth/login` — Authenticate and start a session.
+- `GET /api/v1/auth/me` — Return the current signed-in account.
+- `POST /api/v1/auth/logout` — Revoke the current session.
 
 ### API Endpoints
 
