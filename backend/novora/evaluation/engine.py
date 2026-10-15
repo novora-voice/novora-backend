@@ -15,6 +15,25 @@ from novora.evaluation.rules.required_steps import RequiredStepsRule
 from novora.evaluation.rules.unresolved_work import UnresolvedWorkRule
 from novora.evaluation.rules.unsupported_completion import UnsupportedCompletionClaimsRule
 
+from novora.evaluation.rules.content_rules import (
+    ProhibitedPhraseRule,
+    RequiredClosingRule,
+    RequiredPhraseRule,
+    RequiredQuestionRule,
+)
+from novora.evaluation.rules.flow_rules import (
+    EvidenceAvailabilityRule,
+    RequiredConfirmationRule,
+    RequiredEscalationRule,
+    TurnConstraintsRule,
+)
+from novora.evaluation.rules.tool_rules import (
+    ExpectedToolCallRule,
+    ForbiddenToolCallRule,
+    ToolArgumentValidationRule,
+    ToolCallOrderingRule,
+)
+
 class EvaluationEngine:
     """Orchestrates deterministic rule evaluations and generates traceable reports."""
 
@@ -29,7 +48,20 @@ class EvaluationEngine:
                 RuleType.UNSUPPORTED_COMPLETION: UnsupportedCompletionClaimsRule(),
                 RuleType.UNRESOLVED_WORK: UnresolvedWorkRule(),
                 RuleType.POLICY_COMPLIANCE: PolicyComplianceRule(),
+                RuleType.REQUIRED_PHRASE: RequiredPhraseRule(),
+                RuleType.PROHIBITED_PHRASE: ProhibitedPhraseRule(),
+                RuleType.REQUIRED_QUESTION: RequiredQuestionRule(),
+                RuleType.REQUIRED_CLOSING: RequiredClosingRule(),
+                RuleType.EXPECTED_TOOL_CALL: ExpectedToolCallRule(),
+                RuleType.FORBIDDEN_TOOL_CALL: ForbiddenToolCallRule(),
+                RuleType.TOOL_ARGUMENT_VALIDATION: ToolArgumentValidationRule(),
+                RuleType.TOOL_CALL_ORDERING: ToolCallOrderingRule(),
+                RuleType.REQUIRED_ESCALATION: RequiredEscalationRule(),
+                RuleType.REQUIRED_CONFIRMATION: RequiredConfirmationRule(),
+                RuleType.TURN_CONSTRAINTS: TurnConstraintsRule(),
+                RuleType.EVIDENCE_AVAILABILITY: EvidenceAvailabilityRule(),
             }
+
 
     def register_evaluator(self, rule_type: RuleType, evaluator: BaseRule) -> None:
         """Register or override a rule evaluator strategy."""

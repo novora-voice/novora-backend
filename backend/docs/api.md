@@ -162,3 +162,42 @@ Ingest Twilio telephony status or recording callbacks.
 Ingest completed transcription webhook from AssemblyAI.
 - **Body**: AssemblyAI transcript object with `id`, `text`, `utterances`.
 - **Response**: `{ "status": "normalized", "conversation_id": "..." }`.
+
+---
+
+## 4. Providers & Integration Management
+
+### `GET /api/v1/providers`
+List supported providers (ElevenLabs, AssemblyAI, Vapi, Retell, Twilio) with manifests and supported capabilities.
+
+### `POST /api/v1/integrations`
+Create or update an API integration with masked server-side credential persistence.
+
+### `POST /api/v1/integrations/{integration_id}/test-connectivity`
+Verify live or simulated API connectivity and authentication for a configured provider.
+
+### `GET /api/v1/agents?provider={provider_name}`
+Discover or validate configured agents and assistant IDs for the provider.
+
+---
+
+## 5. Scenario Templates, Ghost-Caller Execution & Batches
+
+### `GET /api/v1/scenarios/templates`
+Retrieve built-in scenario templates:
+- Customer Support & Receptionist
+- Incident Response
+- Language Practitioner
+
+### `POST /api/v1/test-runs`
+Execute a programmatic ghost-caller test conversation against a configured provider agent, capture observable events and tool calls, and run deterministic + LLM evaluations.
+
+### `GET /api/v1/test-runs/{test_run_id}`
+Retrieve execution status, normalized conversation events, tool calls, and final evaluation report.
+
+### `POST /api/v1/batches`
+Trigger a batch evaluation across multiple test cases and scenarios.
+
+### `GET /api/v1/batches/{batch_id}`
+Inspect overall batch progress, pass/fail counts, and partial failures.
+

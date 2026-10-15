@@ -36,13 +36,32 @@ from novora.core.exceptions import (
     SSRFSecurityError,
     TenantIsolationError,
 )
+from novora.core.execution_models import (
+    AgentConfig,
+    BatchEvaluation,
+    IntegrationHealth,
+    NormalizedProviderEvent,
+    ProviderConfig,
+    ScriptedTurn,
+    TestCase,
+    TestRun,
+    ToolCallRecord,
+    ToolResultRecord,
+)
+from novora.core.judge_models import (
+    LLMJudgeResult,
+    LLMJudgeVerdict,
+    RubricCriterion,
+)
 
 __all__ = [
     "ConversationSource",
     "MessageRole",
     "OverallStatus",
+    "RuleSeverity",
     "RuleStatus",
     "RuleType",
+    "TestRunStatus",
     "Conversation",
     "ConversationMessage",
     "EvaluationReport",
@@ -54,9 +73,23 @@ __all__ = [
     "RuleResult",
     "TelephonyCallRecord",
     "WebhookEventRecord",
+    "ProviderConfig",
+    "AgentConfig",
+    "TestCase",
+    "ScriptedTurn",
+    "TestRun",
+    "BatchEvaluation",
+    "IntegrationHealth",
+    "ToolCallRecord",
+    "ToolResultRecord",
+    "NormalizedProviderEvent",
+    "LLMJudgeResult",
+    "LLMJudgeVerdict",
+    "RubricCriterion",
     "EvaluationRepository",
     "RuleEvaluatorProtocol",
     "ScenarioRepository",
     "TelephonyRepository",
     "WebhookEventRepository",
 ]
+

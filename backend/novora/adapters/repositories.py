@@ -1,7 +1,7 @@
 from threading import Lock
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from novora.core.interfaces import EvaluationRepository, ScenarioRepository
-from novora.core.models import EvaluationReport, EvaluationScenario
+from novora.core.models import Conversation, EvaluationReport, EvaluationScenario, TelephonyCallRecord, WebhookEventRecord
 
 class InMemoryScenarioRepository(ScenarioRepository):
     """Thread-safe in-memory scenario store for local development and fast tests."""
@@ -45,23 +45,44 @@ class InMemoryEvaluationRepository(EvaluationRepository):
             matching = [r for r in self._store.values() if r.scenario_id == scenario_id]
         return matching[offset : offset + limit]
 
+class InMemoryConversationRepository:
+    """Thread-safe in-memory conversation store for ingested conversations."""
+
+    def __init__(self) -> None:
+        self._store: Dict[str, Conversation] = {}
+        self._lock = Lock()
+
+    def save(self, conversation: Conversation) -> Conversation:
+        with self._lock:
+            self._store[conversation.id] = conversation
+        return conversation
+
+    def get(self, conversation_id: str) -> Optional[Conversation]:
+        with self._lock:
+            return self._store.get(conversation_id)
+
+    def list_all(self, limit: int = 50, offset: int = 0) -> List[Conversation]:
+        with self._lock:
+            items = list(self._store.values())
+        return items[offset : offset + limit]
+
 class InMemoryTelephonyRepository:
     """Thread-safe in-memory telephony call store."""
 
     def __init__(self) -> None:
-        self._store: Dict[str, Any] = {}
+        self._store: Dict[str, TelephonyCallRecord] = {}
         self._lock = Lock()
 
-    def save(self, record: Any) -> Any:
+    def save(self, record: TelephonyCallRecord) -> TelephonyCallRecord:
         with self._lock:
             self._store[record.call_sid] = record
         return record
 
-    def get(self, call_sid: str) -> Optional[Any]:
+    def get(self, call_sid: str) -> Optional[TelephonyCallRecord]:
         with self._lock:
             return self._store.get(call_sid)
 
-    def list_all(self, limit: int = 50, offset: int = 0) -> List[Any]:
+    def list_all(self, limit: int = 50, offset: int = 0) -> List[TelephonyCallRecord]:
         with self._lock:
             items = list(self._store.values())
         return items[offset : offset + limit]
@@ -70,10 +91,10 @@ class InMemoryWebhookEventRepository:
     """Thread-safe in-memory webhook event store for audit and idempotency."""
 
     def __init__(self) -> None:
-        self._store: Dict[str, Any] = {}
+        self._store: Dict[str, WebhookEventRecord] = {}
         self._lock = Lock()
 
-    def record_event(self, event: Any) -> Any:
+    def record_event(self, event: WebhookEventRecord) -> WebhookEventRecord:
         with self._lock:
             key = f"{event.provider}:{event.event_id}"
             self._store[key] = event
@@ -84,7 +105,7 @@ class InMemoryWebhookEventRepository:
             key = f"{provider}:{event_id}"
             return key in self._store
 
-    def get(self, event_id: str) -> Optional[Any]:
+    def get(self, event_id: str) -> Optional[WebhookEventRecord]:
         with self._lock:
             for k, v in self._store.items():
                 if k.endswith(f":{event_id}"):

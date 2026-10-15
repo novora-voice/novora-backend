@@ -11,6 +11,11 @@ class ProviderCapability(str, Enum):
     TOOL_EXECUTION_LOGS = "tool_execution_logs"
     SIGNATURE_VERIFICATION = "signature_verification"
     SPEAKER_DIARIZATION = "speaker_diarization"
+    PROGRAMMATIC_GHOST_CALLER = "programmatic_ghost_caller"
+    WEBSOCKET_AGENT_SESSION = "websocket_agent_session"
+    TOOL_CALLING_EXECUTION = "tool_calling_execution"
+    AUDIO_INPUT_STREAM = "audio_input_stream"
+    AGENT_DISCOVERY = "agent_discovery"
 
 class ProviderManifest(BaseModel):
     provider_name: str
@@ -34,6 +39,10 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supported_capabilities={
             ProviderCapability.POST_CALL_TRANSCRIPT_WEBHOOK,
             ProviderCapability.SIGNATURE_VERIFICATION,
+            ProviderCapability.PROGRAMMATIC_GHOST_CALLER,
+            ProviderCapability.WEBSOCKET_AGENT_SESSION,
+            ProviderCapability.TOOL_CALLING_EXECUTION,
+            ProviderCapability.AGENT_DISCOVERY,
         },
     ),
     "vapi": ProviderManifest(
@@ -42,6 +51,8 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supported_capabilities={
             ProviderCapability.POST_CALL_TRANSCRIPT_WEBHOOK,
             ProviderCapability.TOOL_EXECUTION_LOGS,
+            ProviderCapability.PROGRAMMATIC_GHOST_CALLER,
+            ProviderCapability.AGENT_DISCOVERY,
         },
     ),
     "retell": ProviderManifest(
@@ -49,6 +60,8 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         category="voice_agent",
         supported_capabilities={
             ProviderCapability.POST_CALL_TRANSCRIPT_WEBHOOK,
+            ProviderCapability.PROGRAMMATIC_GHOST_CALLER,
+            ProviderCapability.AGENT_DISCOVERY,
         },
     ),
     "twilio": ProviderManifest(
@@ -66,6 +79,9 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supported_capabilities={
             ProviderCapability.POST_CALL_TRANSCRIPT_WEBHOOK,
             ProviderCapability.SPEAKER_DIARIZATION,
+            ProviderCapability.WEBSOCKET_AGENT_SESSION,
+            ProviderCapability.AUDIO_INPUT_STREAM,
+            ProviderCapability.TOOL_CALLING_EXECUTION,
         },
     ),
 }

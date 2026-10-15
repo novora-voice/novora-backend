@@ -25,6 +25,21 @@ class ConversationSource(str, Enum):
     RETELL_WEBHOOK = "retell_webhook"
     SYNTHETIC_FIXTURE = "synthetic_fixture"
 
+class RuleSeverity(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+class TestRunStatus(str, Enum):
+    __test__ = False
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class RuleType(str, Enum):
     REQUIRED_INFORMATION = "required_information"
     REQUIRED_STEPS = "required_steps"
@@ -32,3 +47,20 @@ class RuleType(str, Enum):
     UNSUPPORTED_COMPLETION = "unsupported_completion"
     UNRESOLVED_WORK = "unresolved_work"
     POLICY_COMPLIANCE = "policy_compliance"
+    REQUIRED_PHRASE = "required_phrase"
+    PROHIBITED_PHRASE = "prohibited_phrase"
+    REQUIRED_QUESTION = "required_question"
+    EXPECTED_TOOL_CALL = "expected_tool_call"
+    FORBIDDEN_TOOL_CALL = "forbidden_tool_call"
+    TOOL_ARGUMENT_VALIDATION = "tool_argument_validation"
+    TOOL_CALL_ORDERING = "tool_call_ordering"
+    TOOL_RESULT_VALIDATION = "tool_result_validation"
+    REQUIRED_ESCALATION = "required_escalation"
+    REQUIRED_CONFIRMATION = "required_confirmation"
+    REQUIRED_CLOSING = "required_closing"
+    TURN_CONSTRAINTS = "turn_constraints"
+    CONVERSATION_COMPLETION = "conversation_completion"
+    EVIDENCE_AVAILABILITY = "evidence_availability"
+    TIMEOUT_EXECUTION_FAILURE = "timeout_execution_failure"
+    LLM_SEMANTIC_RUBRIC = "llm_semantic_rubric"
+

@@ -40,3 +40,30 @@ class TranscriptionProvider(Protocol):
         scenario_id: str = "",
     ) -> Conversation:
         ...
+
+class ExecutableVoiceProvider(Protocol):
+    """Protocol for providers that support programmatic execution or verification."""
+
+    provider_name: str
+
+    def validate_configuration(self, config: Dict[str, Any]) -> bool:
+        ...
+
+    def check_connectivity(self, config: Dict[str, Any]) -> Any:
+        ...
+
+    def list_or_validate_agents(
+        self,
+        config: Dict[str, Any],
+        agent_id: Any = None,
+    ) -> Any:
+        ...
+
+    def execute_test_conversation(
+        self,
+        test_case: Any,
+        agent: Any,
+        config: Dict[str, Any],
+    ) -> Any:
+        ...
+
