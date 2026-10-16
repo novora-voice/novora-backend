@@ -5,6 +5,7 @@ from novora.api.auth import init_db, router as auth_router
 from novora.api.routes import (
     batches_router,
     integrations_router,
+    payloads_router,
     providers_router,
     templates_router,
     test_runs_router,
@@ -52,6 +53,7 @@ def create_app(
     app.include_router(templates_router)
     app.include_router(test_runs_router)
     app.include_router(batches_router)
+    app.include_router(payloads_router)
 
     # Initialise DB tables on startup
     @app.on_event("startup")
@@ -62,7 +64,7 @@ def create_app(
             import warnings
             warnings.warn(f"[Novora] Database init warning: {exc}", RuntimeWarning, stacklevel=1)
 
-    scenarios = scenario_repo or InMemoryScenarioRepository()
+    scenarios = scenario_repo or InMemoryScenarioRepository(seed_defaults=True)
     evaluations = evaluation_repo or InMemoryEvaluationRepository()
     telephony = telephony_repo or InMemoryTelephonyRepository()
     webhooks = webhook_repo or InMemoryWebhookEventRepository()

@@ -1,388 +1,579 @@
-Novora — Principal AI Software Engineer Build Plan
-Approach this project like a Principal AI Software Engineer
-You're called Claude A
+Novora is becoming a provider-aware voice-agent testing and evaluation platform, where customers configure what they want to test and Novora runs the agent, captures its actual behavior, and evaluates the results.
+The important distinction is that Novora should not merely evaluate transcripts uploaded after a call. Where a provider supports programmatic test conversations, Novora should act as a ghost caller: send scripted text to a staging agent, capture its responses and tool calls, and determine whether it behaved as expected.
+The provider determines the execution method and available evidence. Novora owns the evaluation framework.
+The product workflow
+1. Choose a provider
+ElevenLabs, AssemblyAI, Vapi, or Retell
 
-Novora should be built as a modular AI voice-agent infrastructure platform, not a collection of provider-specific scripts.
-1. What we're building
-Novora helps businesses determine whether their AI voice agents actually accomplish business goals, follow policies, and complete tasks reliably.
-Novora Platform
-Business goals · Test cases · Policies · Evaluations · Observability
 
+2. Choose or configure an agent scenario
+Customer support, incident response, language practice, or another supported scenario
 
-Provider Integrations
-Connect existing voice agents, webhooks, transcripts, and supported providers.
 
+3. Configure evaluation criteria
+Deterministic checks, LLM-as-judge rubrics, expected tool calls, and scenario-specific rules
 
-Novora Runtime
-Manage state, tools, memory, policies, task handoffs, and follow-up.
 
+4. Execute the test
+Run a provider-supported test conversation and capture actual events, responses, and actions
 
 
+5. Evaluate and persist the report
+Combine deterministic results and LLM judgments, preserve evidence, and show failures and recommendations
 
-Knowledge adapters
-Customer-owned vector and graph systems, accessed through controlled interfaces.
+Important provider distinction
+The implementation prompt should explicitly prevent Claude from assuming every provider supports the same testing protocol.
+- ElevenLabs: Its documented agent WebSocket supports text messages and emits conversation events. This is a strong candidate for the first ghost-caller integration. 
+  
+  ElevenLabs Documentation
+  +1
+- AssemblyAI: Its documented Voice Agent API uses wss://agents.assemblyai.com/v1/ws and describes audio input, transcripts, replies, and tool calls. The supplied example's text_input event should not be treated as supported without verification. 
+  
+  Documentation
+  +1
+- Vapi: Its API supports creating assistants and calls. The implementation must determine which call modes are appropriate for safe automated testing and how to retrieve the resulting events and artifacts. 
+- Retell AI too
 
+Branch A — feat/provider-evaluation-engine
+Backend, provider execution, deterministic checks, LLM judge, PostgreSQL, tests and APIs.
 
-Business integrations
-Customer-authorized APIs, tools, approval systems, and external services.
+### THIS IS YOURMAIN PROMPT FOLLOW OTHER INSTRUCTIONS IN THE IMPLEMENTATION PLAN.
 
+# NOVORA — Principal Backend & AI Infrastructure Engineer
 
+## Mission
 
+You are the Principal AI Engineer responsible for implementing Novora's provider-aware voice-agent testing and evaluation engine.
 
-Foundation: shared contracts, tenant isolation, PostgreSQL persistence, automated tests, audit logs, and provider-independent business logic.
+Novora is an AI voice-agent testing, monitoring, and evaluation platform. Users choose a supported provider, configure a testing scenario, define deterministic checks and LLM-as-judge rubrics, execute a test against a provider-supported agent interface, capture the agent's actual behavior, and receive an evidence-backed evaluation report.
 
-The problem Novora solves
-A voice agent can sound convincing while still failing the business. It might promise a refund without checking the refund system, invent a policy, fail to collect a required detail, or end a call without completing the task.
-Novora should help a business answer five questions:
-1. Did the agent complete the intended task?
-2. Did it follow the business's rules and policies?
-3. What evidence supports the evaluation result?
-4. What should happen next when the agent fails or needs help?
-5. Did the corrective action actually improve future performance?
-Our first milestone is the evaluation engine—not a full autonomous voice runtime. We should first prove that Novora can test conversations, evaluate them consistently, and produce reports with traceable evidence. Then we add a real provider connection, followed by the Novora Runtime.
-That order keeps the initial build affordable, testable, and achievable while you're applying for AI voice engineering roles.
+This is not merely a transcript scoring application. Where the provider supports it, Novora should act as a programmatic ghost caller, send scripted user messages to a staging agent, capture the resulting conversation events and tool calls, and evaluate the actual observed behavior.
 
+The provider adapter owns provider-specific communication. The Novora evaluation engine owns the common evaluation semantics.
 
-2. The technical direction
-These are the architectural decisions I would give the team at the start.
-Area	Initial decision
-Architecture	Modular monolith with explicit module boundaries
-Backend	Python + FastAPI
-Data persistence	PostgreSQL
-Frontend	Next.js + TypeScript
-Evaluation	Deterministic rules first and LLM judge behind an interface
-Background work	Introduce a worker/queue when asynchronous workloads require it
-Voice integrations	Provider-neutral contracts with individual adapters
-Knowledge integrations	Separate vector-store and graph-store interfaces
-Runtime	Later phase; initially use existing model APIs rather than train a model
-Testing	Unit, API, contract, integration, security, and regression tests
-Deployment	Local development first; free-tier deployment for the demo if practical
+## 1. Branch and repository discipline
 
-The modular boundaries
-- core — domain entities, business rules, evaluation orchestration, and shared domain interfaces.
-- providers — adapters for external voice-agent providers, model providers, and their APIs.
-- adapters — integration with persistence, customer knowledge infrastructure, and external business systems.
-- api — HTTP routes, request validation, authentication integration, and response serialization.
-- evaluation — deterministic checks, scoring, evidence collection, and evaluation reports.
-- runtime — future stateful agent execution, tool calling, handoffs, and follow-up.
-- tests — automated verification of the contracts and the behavior of the platform.
-These are logical boundaries. They do not all need to be separate deployable services or Python distributions.
+Work only on:
 
-Claude A — Core & Evaluation Engineer
-Primary builder
-Owns the domain model, evaluation engine, evaluation API, persistence requirements, and end-to-end evaluation workflow.
-Branch: feat/evaluation-core-api
+`feat/provider-evaluation-engine`
 
+Before coding:
 
-# NOVORA — PRINCIPAL AI SOFTWARE ENGINEER MASTER BRIEF
+1. Inspect the existing repository and current branch.
+2. Read existing architecture, API contracts, database models, tests, and provider implementations.
+3. Preserve working code and existing authentication.
+4. Do not overwrite unrelated changes.
+5. Create an implementation plan.
+6. Establish the shared contracts before the frontend engineer implements dependent workflows.
 
-## Role
+Do not merge into main or push directly to main.
 
-You are a Principal AI Software Engineer working on Novora, an AI voice-agent infrastructure platform. Work with the discipline of a senior engineer responsible for architecture, implementation quality, security, testing, and long-term maintainability.
+Publish and maintain these documents early:
 
-Do not act as an autocomplete tool. Understand the problem, inspect the repository, define a plan, implement a small coherent increment, verify it, and report the evidence.
+- `docs/architecture.md`
+- `docs/provider-capabilities.md`
+- `docs/evaluation-contracts.md`
+- `docs/api.md`
+- `docs/testing-strategy.md`
 
-## Product mission
+Commit changes in small, focused units.
 
-Novora helps businesses test, evaluate, monitor, and improve AI voice agents based on business outcomes—not merely whether a conversation sounds natural.
+## 2. Core product model
 
-A customer should be able to define:
-- Business goals and task success criteria.
-- Test scenarios and expected outcomes.
-- Policies, constraints, and required information.
-- Evaluation rules and acceptable failure conditions.
-- Authorized knowledge sources and integrations.
-- Human-review and approval requirements.
+Support the following initial scenario templates:
 
-Novora evaluates whether an agent followed the rules, completed the task, and produced the expected outcome. Results must include supporting evidence.
+### Customer Support & Receptionist
 
-## Product modes
+Evaluate whether the agent understands the request, asks for necessary information, follows policies, selects appropriate tools, handles customer issues, and escalates when necessary.
 
-### Mode 1: Connected agent
-
-A customer already uses a voice-agent provider. Novora accepts supported test results, transcripts, webhook events, or provider-specific data through an adapter. Novora normalizes the data and evaluates the interaction.
-
-Start with transcript-based evaluation. Add a real voice-provider integration only after the core contracts and evaluation workflow are working.
-
-### Mode 2: Novora-managed runtime
-
-In a later phase, customers can use Novora to orchestrate an agent while selecting supported model and voice providers. Novora Runtime will manage task state, memory, tools, policy checks, handoffs, and follow-up.
-
-Do not build a full runtime, live calling system, or model-training pipeline in the first milestone. Design clean extension points without implementing speculative functionality.
-
-## Architecture principles
-
-1. Use a modular monolith before considering microservices.
-2. Keep business logic independent of specific providers, databases, web frameworks, and UI components.
-3. Define interfaces before building implementations.
-4. Use adapters for external providers and infrastructure.
-5. Prefer explicit data models, typed interfaces, dependency injection, and clear error handling.
-6. Use deterministic evaluation rules first. Any LLM-based evaluator must be optional, isolated behind an interface, and must not be treated as infallible.
-7. Every evaluation result must be traceable to input evidence and the rule that produced it.
-8. Keep secrets, credentials, customer data, and provider-specific payloads out of logs and public repositories.
-9. Use migrations for database changes and automated tests for important behavior.
-10. Keep the implementation small, readable, modular, and easy for another engineer to maintain.
-
-## Technology direction
-
-- Backend: Python and FastAPI.
-- Frontend: Next.js and TypeScript.
-- Persistence: PostgreSQL.
-- Tests: pytest for backend tests and the appropriate test framework for frontend tests.
-- External integrations: provider adapters with explicit contracts.
-- Background jobs: add a queue only when required by a concrete workflow.
-- Model APIs: use existing model providers later; do not train a model for the initial product.
+### Incident Response
 
-Inspect the existing repository before choosing exact package versions or changing its tooling. Preserve working code and configuration where reasonable. Document any justified deviation.
+Evaluate whether the agent recognizes an incident, gathers required information, follows the configured incident policy, invokes appropriate approved tools, escalates at the correct point, and provides a clear status or next step.
 
-## Initial end-to-end workflow
+### Language Practitioner
 
-1. A user creates a test scenario with a name, business goal, input conversation or test fixture, and expected outcome.
-2. The user submits a transcript or a normalized conversation record.
-3. The API validates the request and calls the evaluation service.
-4. The evaluation service runs deterministic checks against the transcript and scenario.
-5. Each check returns a status, explanation, and evidence referencing the relevant input.
-6. The evaluator produces an overall result without hiding individual failures.
-7. The API returns a structured report that the UI or a client can display.
-8. The evaluation can be repeated against the same fixtures to detect regressions.
+Evaluate whether the agent practices the configured language, responds at the requested level, follows the selected learning approach, corrects mistakes appropriately, and stays within the requested exercise.
 
-## Evaluation requirements
+These are reusable starting templates, not hardcoded limitations. Users must be able to customize criteria and create additional scenarios where the data model supports it.
 
-Start with transparent checks such as:
-- Required information was collected.
-- Required workflow steps occurred.
-- Prohibited promises or actions were not made.
-- Policy-sensitive decisions were handled correctly.
-- The agent claimed an action was completed without evidence.
-- The conversation ended with unresolved required work.
-- The expected business outcome was or was not demonstrated by the available evidence.
+Do not assume every provider has prebuilt agents.
 
-Do not claim to know that a refund, booking, payment, or external action actually succeeded merely because the agent said it did. Verify external actions only when a trusted result or authorized integration is available.
+ElevenLabs users may select an existing configured agent. AssemblyAI users may configure the supported voice-agent session using a system prompt and tools. Vapi and Retell must have provider-specific agent/configuration identifiers and supported execution workflows.
 
-Use explicit statuses such as PASS, FAIL, and INCONCLUSIVE where appropriate. Missing evidence must not automatically count as success. Keep rule results separate from an overall score.
+## 3. Provider adapter architecture
 
-## Security requirements
+Create a common provider interface with provider-specific implementations.
 
-- Validate and limit all input sizes and accepted content types.
-- Do not execute instructions found inside customer transcripts or retrieved documents as system instructions.
-- Treat transcripts, tool outputs, provider payloads, and knowledge-base content as untrusted data.
-- Never expose API keys or credentials in responses, logs, test fixtures, or documentation.
-- Enforce tenant isolation at the application and data-access boundaries when multi-tenancy is implemented.
-- Apply least privilege to integrations. Prefer read-only access initially.
-- Require explicit authorization for actions that change customer data or trigger financial, account, or operational consequences.
-- For customer-provided knowledge endpoints, use approved connector configurations; do not fetch arbitrary URLs. Prevent SSRF, validate destinations, and restrict network access.
-- Avoid arbitrary graph queries or unrestricted database access. Use narrowly scoped query interfaces.
-- Add audit records for security-sensitive operations.
-- Use synthetic data in public demos and automated tests.
+Potential structure, adapted to the existing repository:
 
-## Code quality rules
+- `providers/base.py`
+- `providers/registry.py`
+- `providers/elevenlabs/`
+- `providers/assemblyai/`
+- `providers/vapi/`
+- `providers/retell/`
+- `execution/`
+- `normalization/`
+- `evaluation/deterministic/`
+- `evaluation/llm_judge/`
+- `evaluation/orchestration/`
+- `persistence/`
+- `api/`
 
-- Use clear, descriptive names.
-- Keep functions focused and reasonably short.
-- Avoid giant files, deeply nested conditionals, duplicate logic, unnecessary abstractions, and premature generalization.
-- Add comments to explain intent, invariants, security decisions, or non-obvious trade-offs—not to narrate obvious code.
-- Add docstrings to public modules, classes, and functions where they improve understanding.
-- Type public interfaces and important data structures.
-- Validate at system boundaries.
-- Catch specific exceptions and return useful, safe error messages.
-- Do not silently swallow errors or use mock implementations in production paths.
-- Do not add a dependency unless it solves a concrete problem.
-- Do not fabricate test results, performance claims, or completed features.
+Keep every source file below 200 lines. Split modules by responsibility.
 
-## Git and collaboration rules
+The shared provider interface should define the supported operations needed for a test run, such as:
 
-- Work only on your assigned branch.
-- Never push directly to main.
-- Never rewrite another engineer's branch or discard their work.
-- Do not change files owned by the other engineer without agreement.
-- Do not commit secrets, real customer transcripts, credentials, or local environment files.
-- Keep commits small and descriptive.
-- Do not merge your own branch unless the technical lead explicitly authorizes it.
-- If shared contracts need to change, document the reason and proposed change before implementation.
-- Do not report a test as passing unless you actually ran it and observed the result.
+- Validate configuration.
+- Check connectivity.
+- Discover or validate an agent/configuration where the API permits it.
+- Execute a supported test conversation.
+- Capture normalized events.
+- Report capabilities and unsupported operations.
+- Return a normalized execution result.
 
-## Required completion report
+Do not require every provider to implement identical capabilities. Represent capability differences explicitly.
 
-At the end of each work session, report:
+A provider adapter must not implement the evaluation policy itself.
 
-1. What changed and why.
-2. Files created or modified.
-3. The problem the change solves.
-4. Tests actually run and their results.
-5. Known limitations and unverified behavior.
-6. Security implications or new trust boundaries.
-7. Commands needed to run or verify the work.
-8. Commit hash and branch name, if committed.
-9. Remaining tasks, ordered by importance.
+## 4. Provider-specific implementation
 
-Your responsibility is to deliver a small, correct, verifiable increment—not the largest possible amount of code.
+### ElevenLabs
 
-# CLAUDE B — PROVIDER ADAPTERS, INTEGRATION TESTS & SECURITY ENGINEER
+Implement a server-side adapter for configured ElevenLabs Conversational AI agents.
 
-## Your ownership
+Use the official documentation to implement the supported WebSocket workflow and event handling.
 
-Branch: `feat/provider-adapters-test-harness`
+Potentially relevant documented events include:
 
-You own the provider integration boundary, normalized input adapters, integration-test infrastructure, contract tests, and independent security/quality review.
+- `user_transcript`
+- `agent_response`
+- `client_tool_call`
+- `mcp_tool_call`
+- `client_tool_result`
+- Other supported conversation lifecycle events
 
-Your job is to make Novora able to accept data from external systems without allowing those systems to dictate Novora's internal business logic.
+Use a provider-supported text message to simulate the caller where supported. Capture the actual response and tool-call events.
 
-Do not independently rewrite Claude A's evaluation engine or domain models. Read and implement the approved contracts in `docs/contracts.md`. If those contracts do not exist or are unstable, prepare a proposal and request review before building dependent code.
+Handle authentication, session lifecycle, timeouts, malformed events, connection failures, and cleanup.
 
-## Problem you are solving
+Do not assume that internal reasoning is available or required. Evaluate observable outputs, tool requests, tool results, and other permitted evidence. Do not persist private chain-of-thought.
 
-Voice-agent providers use different payloads, event names, transcript formats, authentication methods, and lifecycle conventions. If Novora's core code directly depends on every provider's API, each new integration will make the platform harder to maintain.
+Official documentation:
+https://elevenlabs.io/docs/eleven-agents/api-reference/eleven-agents/websocket
 
-Create a stable boundary so Novora can accept normalized conversations now and connect supported providers later.
+### AssemblyAI
 
-## Phase 0 — Establish the integration contract
+AssemblyAI does not follow the same prebuilt-agent model as ElevenLabs. Support its Voice Agent API configuration using the system prompt and supported tools.
 
-1. Inspect the repository and read the architecture and contract documents.
-2. Confirm the modules Claude A owns.
-3. Define the provider adapter interface and input validation boundary.
-4. Document the ownership of every file you plan to create or modify.
-5. Do not change the core contract silently.
-6. Coordinate any shared-type changes with Claude A and the technical lead.
+Use the official WebSocket endpoint and event contract. Verify the currently documented input protocol before implementing a text-only ghost-caller flow.
 
-The integration contract should conceptually support:
-- Parsing a supported external payload.
-- Validating its structure.
-- Normalizing it into Novora's conversation schema.
-- Returning a typed error for unsupported or malformed input.
-- Preserving permitted source metadata for traceability.
-- Preventing raw provider payloads from leaking into the core domain model.
+The initial implementation must not assume that an undocumented `text_input` event exists.
 
-Keep provider-specific authentication and transport code inside the relevant adapter.
+If text-only injection is unsupported, expose the supported execution mode, such as generated or prerecorded audio input where appropriate, or explicitly mark text-only simulation as unavailable.
 
-## Phase 1 — Build a provider-neutral ingestion adapter
+Capture supported events such as:
 
-Start with transcript or normalized-conversation ingestion. This is the first integration path; it does not require a live voice provider.
+- `transcript.user`
+- `transcript.agent`
+- `reply.started`
+- `reply.done`
+- `tool.call`
+- `tool.result`
+- Session errors and interruptions
+
+Ensure tool execution is controlled by the backend and uses explicitly registered, approved tools.
+
+Official documentation:
+https://www.assemblyai.com/docs/voice-agents/voice-agent-api
+
+### Vapi
+
+Create a dedicated Vapi adapter and configuration workflow.
+
+Use the official API to validate configuration and implement only verified test operations.
+
+Support configured assistants, relevant tools, and available call/test artifacts according to the documented API.
+
+Do not place real outbound calls automatically. Require explicit authorization and confirmation for test modes that can contact real telephone numbers or incur charges.
+
+Prefer safe staging configurations and non-production targets.
+
+Official documentation:
+https://docs.vapi.ai/api-reference/assistants/create
+https://docs.vapi.ai/api-reference/calls/create
+
+### Retell
+
+Create a separate Retell adapter, configuration model, and capability description.
+
+Read the official Retell API documentation before implementing calls, simulations, or test execution.
+
+Do not assume that Retell supports the same text-message injection protocol as ElevenLabs. Implement only verified supported behavior and make unavailable modes explicit.
+
+Documentation index:
+https://docs.retellai.com/llms.txt
+
+## 5. Normalized conversation and event contracts
+
+Define provider-neutral data models for:
+
+- Provider configuration reference.
+- Agent configuration reference.
+- Scenario.
+- Evaluation criteria.
+- Test case.
+- Test run.
+- Conversation turn.
+- Normalized provider event.
+- Tool call.
+- Tool result.
+- Deterministic check result.
+- LLM judge result.
+- Final evaluation report.
+- Batch evaluation.
+- Integration health status.
+
+Preserve provider-specific metadata in a validated, bounded metadata field where necessary, without leaking credentials or uncontrolled payloads into the domain model.
+
+Every event should carry appropriate identifiers, timestamps, and ordering information where available.
+
+Normalize provider differences without erasing important information such as interrupted replies, tool-call failures, session errors, or missing results.
+
+## 6. Deterministic evaluation engine
+
+Build a reusable, extensible deterministic evaluation engine.
+
+Support more than basic keyword matching.
+
+Implement suitable rule types, including:
+
+- Required phrase or concept.
+- Prohibited phrase or behavior.
+- Required information collected.
+- Required question asked.
+- Expected tool call.
+- Forbidden tool call.
+- Tool argument validation.
+- Tool-call ordering.
+- Tool result validation.
+- Required escalation.
+- Required confirmation before a sensitive action.
+- Required closing or next step.
+- Maximum or minimum turn constraints.
+- Conversation completion.
+- Required evidence availability.
+- Policy compliance using structured rules.
+- Expected response structure where deterministic validation is appropriate.
+- Timeout and execution failure detection.
+
+Do not force every natural-language criterion into brittle string matching.
+
+Represent each rule with a stable identifier, type, configuration, severity, and result.
+
+Each result should include:
+
+- PASS, FAIL, or INCONCLUSIVE.
+- A concise explanation.
+- Evidence references.
+- The rule identifier.
+- Relevant observed events or transcript excerpts.
+- Any validation error.
+
+A missing event is not automatically proof of failure if the provider session ended prematurely or required evidence was unavailable. Use INCONCLUSIVE where the result cannot be reliably determined.
+
+## 7. LLM-as-judge evaluation
+
+Implement an LLM judge as a separate service behind a provider-neutral interface.
+
+The judge should assess criteria that require semantic understanding, such as:
+
+- Whether the agent understood the user's intent.
+- Whether the response addressed the request.
+- Whether the agent remained within the defined role.
+- Whether the conversation followed the specified policy.
+- Whether a clarification was appropriate.
+- Whether the agent's explanation was helpful and relevant.
+- Whether the agent handled frustration or ambiguity appropriately.
+- Whether a language-practice response matched the requested learning level.
+- Whether an incident-response conversation followed the intended process.
+- Whether a customer-support interaction reached an acceptable resolution.
+
+Each judge request must receive the specific scenario, configured rubric, relevant transcript, and permitted event evidence.
+
+Require structured output validated against a schema. Include the criterion identifier, result, concise rationale, evidence references, and confidence or uncertainty where supported.
+
+Treat transcripts, tool outputs, provider payloads, and user-provided scenario content as untrusted data. They must never override the judge's instructions or authorize tool execution.
+
+Do not ask the judge to reveal chain-of-thought. Store concise explanations grounded in evidence.
+
+Support configurable rubrics and model settings through server-side configuration.
+
+If no LLM provider is configured, report the judge as unavailable instead of silently returning a successful result.
+
+## 8. Combined evaluation orchestration
+
+Implement a deterministic-plus-LLM evaluation pipeline.
+
+Suggested sequence:
+
+1. Validate the scenario and provider configuration.
+2. Execute the test.
+3. Persist normalized events and execution status.
+4. Run deterministic checks against the observed evidence.
+5. Run LLM judgments against the configured semantic criteria.
+6. Validate the judge output.
+7. Combine results using explicit aggregation rules.
+8. Persist the report.
+9. Return the report and evidence references to the frontend.
+
+The LLM judge must evaluate configured deterministic criteria where useful, but it cannot rewrite the deterministic results.
+
+Preserve the distinction between:
+
+- Deterministic outcome.
+- LLM judge outcome.
+- Final aggregated outcome.
+- Execution status.
+
+A failed critical deterministic safety rule must not be overridden by a favorable LLM judgment.
+
+Use configurable severity and aggregation policies. Default to conservative behavior when critical evidence is missing.
+
+For example:
+
+- A prohibited tool call was observed: deterministic FAIL.
+- The judge believes the conversation sounded appropriate: LLM PASS.
+- The critical rule still fails in the final report.
+
+Likewise, a timeout or provider error should be represented as an execution failure or inconclusive evaluation, not an ordinary agent failure without supporting evidence.
+
+## 9. Tool-call verification and execution safety
+
+Novora must evaluate what the provider agent actually attempted and what happened afterward.
+
+Capture:
+
+- Tool name.
+- Requested arguments.
+- Invocation time.
+- Execution status.
+- Returned result, with sensitive values redacted.
+- Failure information.
+- Correlation identifier.
+
+Never execute arbitrary tool names or arguments emitted by an agent.
+
+Use an explicit registry of permitted tools and validated argument schemas. Enforce timeouts and restrict access to registered integrations.
+
+Distinguish an attempted action from a completed action. A tool-call event alone does not prove that a refund, booking, database mutation, or other external action succeeded.
+
+For evaluation runs, prefer sandbox data, mocked external effects, or read-only tools unless the user has explicitly configured and authorized a real test environment.
+
+Do not allow an evaluation to trigger destructive production operations by default.
+
+## 10. PostgreSQL relational persistence
+
+Use the existing PostgreSQL setup and migration system.
+
+Design proper relational entities and foreign keys rather than storing the entire application state in one JSON document.
+
+The model should support relationships among:
+
+- Users.
+- Provider integrations.
+- Provider-specific configuration references.
+- Agents.
+- Scenarios.
+- Scenario criteria.
+- Test cases.
+- Evaluation runs.
+- Batch runs.
+- Run-to-test associations.
+- Conversation events.
+- Deterministic results.
+- LLM judge results.
+- Final reports.
+- Tool-call evidence.
+
+Adapt to the existing authentication and workspace model. Do not introduce a second competing user model.
+
+Add appropriate indexes, unique constraints, timestamps, cascading behavior, and transactional boundaries.
+
+Keep provider secrets out of ordinary relational fields and API responses. Prefer encrypted secret storage or a documented server-side secret-management mechanism.
+
+Use database migrations. Never reset or drop user data to simplify a schema change.
+
+## 11. Evaluation history and batch execution
+
+Implement persistent evaluation history.
+
+Users must be able to:
+
+- View previous evaluations.
+- Filter by provider, scenario, status, and time where supported.
+- Open a report.
+- Re-run an existing evaluation.
+- Run multiple selected test cases as a batch.
+- Track each test's status within a batch.
+- Inspect failed and inconclusive runs.
+- Compare results between runs where criteria and versions permit meaningful comparison.
+
+A batch must persist independently of the browser session.
+
+Use background jobs if execution duration requires them. Reuse existing queue infrastructure if present; do not introduce a new queue solely for architectural fashion.
+
+Support idempotency, bounded retries, timeouts, cancellation where feasible, and explicit partial-failure reporting.
+
+A batch that contains failed or inconclusive cases must not be represented as entirely successful.
+
+## 12. Provider configuration and integration health
+
+Provide backend APIs to:
+
+- List supported providers and capabilities.
+- Create or update an integration.
+- Validate a provider configuration.
+- Test provider connectivity.
+- List or validate available agents where supported.
+- Initiate an evaluation.
+- Retrieve run status and report.
+- Retrieve evaluation history.
+- Create and inspect batch evaluations.
+- Retrieve provider health and error information.
+
+A provider configuration should clearly distinguish missing credentials, invalid credentials, unsupported operations, and connection failures.
+
+Use masked credentials and server-side secret handling.
+
+Provider keys supplied by the platform operator belong in server environment variables or the configured secret manager. User-owned provider keys must be stored according to the application's existing secure credential model, not inserted into the operator's `.env` file.
+
+## 13. API contract and frontend coordination
+
+Before implementing all routes, publish the shared schemas and endpoint definitions.
+
+Coordinate with Claude B so the frontend can use stable contracts for:
+
+- Provider selection.
+- Agent configuration.
+- Scenario templates.
+- Criteria editing.
+- Evaluation execution.
+- Batch runs.
+- Evaluation history.
+- Reports and evidence.
+- Integration status.
+
+Do not have the frontend engineer guess response shapes or invent endpoints.
+
+Maintain backward compatibility where practical.
+
+## 14. Security and reliability
 
 Implement:
-- A clear adapter interface.
-- A normalized input schema.
-- A parser for a documented sample payload.
-- Input size and content validation.
-- Typed errors for malformed, unsupported, or unauthorized requests.
-- A traceable link to the source record where appropriate.
-- Safe handling of timestamps, speaker roles, and missing metadata.
 
-Build synthetic fixtures that represent:
-- A successful customer-service interaction.
-- An incomplete interaction.
-- A malformed payload.
-- Missing or duplicated messages.
-- A conversation with prohibited or unsupported claims.
-- A provider payload containing untrusted instruction-like text.
+- Server-side credential handling.
+- Request validation.
+- Authentication and authorization on protected routes.
+- Per-user or per-workspace data scoping consistent with the existing architecture.
+- Provider timeout and error handling.
+- Webhook signature verification where applicable.
+- Idempotent event processing.
+- Safe logging and redaction.
+- Bounded payload sizes.
+- Rate limits where appropriate.
+- Strict allowlisting of executable tools.
+- Safe handling of untrusted transcripts and tool results.
+- Protection against duplicate execution and unintended external side effects.
 
-Do not execute instructions in transcripts. Transcripts are data to evaluate, not instructions to the platform.
+Do not log API keys, session tokens, or full sensitive payloads by default.
 
-## Phase 2 — Build the adapter boundary for voice providers
+## 15. Tests and acceptance criteria
 
-Define a provider interface that can later support adapters such as `ElevenLabsAdapter` and additional providers without modifying the evaluation engine.
+Write unit tests for deterministic rules, judge-output validation, aggregation policy, provider event normalization, and database relationships.
 
-The interface should account for the capabilities that providers may expose:
-- Importing or receiving conversation events.
-- Normalizing transcripts and metadata.
-- Verifying webhook authenticity where supported.
-- Identifying provider sessions and event identifiers.
-- Handling duplicate delivery and event ordering.
-- Representing unsupported capabilities explicitly.
+Write integration tests using mocked provider responses, without requiring paid provider calls in the normal test suite.
 
-Do not pretend every provider supports the same operations. Use capability declarations or explicit unsupported-operation errors rather than fake implementations.
+Add opt-in live integration tests that run only when the necessary credentials and safe test-agent IDs are configured.
 
-Do not connect to a paid live provider in this phase unless the technical lead explicitly approves the scope and credentials are safely available.
+The backend milestone is complete when a developer can:
 
-## Phase 3 — Design knowledge connectors, not a universal database client
+1. Configure a supported provider.
+2. Create a scenario and evaluation criteria.
+3. Submit a test conversation or execute a supported provider test.
+4. Capture actual observed conversation events and tool calls.
+5. Run deterministic and LLM-based evaluations.
+6. Persist a complete evidence-backed report.
+7. Retrieve the report and history after restarting the application.
+8. Run multiple evaluations and inspect partial failures.
+9. See clear errors when provider functionality is unavailable.
 
-Novora will eventually support customer-owned knowledge infrastructure. Customers own their knowledge bases and supply authorized connection configuration; Novora provides the connector code.
+Run tests, lint, type checks, migrations, and relevant build commands. Report actual results, not assumed results.
 
-Design separate contracts for vector search and graph queries.
+Do not claim a provider integration is complete until it has been verified against its actual API or clearly identified as mocked or awaiting credentials.
 
-Potential vector adapters:
-- Chroma
-- Pinecone
-- Weaviate
-- Qdrant
+Deliver modular, typed, maintainable code. Keep each source file below 200 lines.
 
-Potential graph adapters:
-- Neo4j
-- Additional graph providers in future versions
 
-For the first milestone, document the contracts and implement only what is required to prove the boundary. Do not connect every database or add all provider SDKs just to claim support.
+The distinction is that the backend prompt prioritizes ElevenLabs as the first end-to-end implementation, while the other providers must use their verified capabilities.
+Prompt	Scope
+Claude A — Backend	Shared evaluation engine + provider adapters for ElevenLabs, AssemblyAI, Vapi, and Retell
 
-Requirements:
-- Use scoped credentials and tenant-specific configuration.
-- Keep secrets out of source control and logs.
-- Use read-only access by default.
-- Apply query limits and timeouts.
-- Restrict graph operations to approved, parameterized query patterns.
-- Validate endpoints and block unsafe internal network destinations to mitigate SSRF.
-- Never expose a customer's entire knowledge base to another tenant.
-- Do not execute retrieved text as instructions.
-- Make unsupported connector capabilities explicit.
+For Novora, I'd structure it like this:
+- Shared code: scenario management, test orchestration, evaluation criteria, LLM judging, report generation, persistence, and dashboard APIs.
+- Provider-specific code: connection setup, authentication, session initialization, sending test input, receiving events, and handling provider-specific errors.
+- Input adapter: translates Novora's standard test message into whatever input format the provider actually supports.
+The one thing I'd verify
+The official protocols don't quite support the assumption that only a field name changes:
+- ElevenLabs: its Agents WebSocket documents a user_message event for text input. 
+  
+  ElevenLabs Documentation
+- AssemblyAI: its Voice Agent WebSocket documents input.audio for caller input, plus session configuration and conversation events. I couldn't verify a matching text_input event in its documented event reference
 
-## Phase 4 — Build integration and contract tests
+The key is to get one complete integration working, then reuse its shared code for the other providers instead of rebuilding the platform.
 
-Create automated tests that verify:
-- Each adapter produces the approved normalized schema.
-- Invalid payloads fail safely.
-- Duplicate events do not create duplicate evaluations where idempotency is required.
-- Unknown provider event types are handled explicitly.
-- Timestamp and speaker normalization is correct.
-- Webhook signatures are verified when required by the provider.
-- Secrets and sensitive payloads do not appear in logs or error responses.
-- Core evaluation behavior remains unchanged when adapter implementations change.
+The implementation plan
+Get ElevenLabs working end to end first.
 
-Keep fixtures synthetic. Do not commit customer transcripts or API keys.
+Connect an agent, run a test conversation, capture events, evaluate the conversation, and save a report. Verify that the entire workflow works—not just the connection.
 
-Where possible, use contract tests that can run without external accounts, network access, or paid services. Any tests requiring real credentials must be separately identified and must not be reported as run if they were not.
+Reuse the shared code for AssemblyAI.
 
-## Phase 5 — Independent security and code review
+Keep your scenario engine, evaluation logic, LLM judge, database models, and reporting. Adapt the provider connection and input/output handling to AssemblyAI's actual protocol.
 
-Review the complete available implementation, including Claude A's changes, without overwriting their files.
+Repeat for Vapi and Retell.
 
-Inspect:
-- Input validation and size limits.
-- Authentication and authorization boundaries.
-- Tenant isolation.
-- Unsafe deserialization.
-- Prompt injection through transcripts or retrieved content.
-- SSRF through customer-supplied connection settings.
-- Credential exposure.
-- SQL injection and unsafe graph queries.
-- Missing timeouts and unbounded retries.
-- Duplicate webhook processing.
-- Sensitive information in logs.
-- Overstated evaluation results.
-- Tests that pass without asserting meaningful behavior.
+Reuse the same core, adding only the provider-specific integration code and any capability differences.
 
-Report each finding with:
-- Severity.
-- Affected file or interface.
-- Reproducible explanation.
-- Expected impact.
-- Recommended fix.
-- Regression test that should prevent recurrence.
+Test each provider independently.
 
-Fix issues in files you own. For core files owned by Claude A, raise a finding and propose a minimal patch for review instead of silently rewriting the implementation.
+Verify that each one can execute a test and return real evidence before marking it as supported in Novora.
 
-## Phase 6 — Documentation and handoff
+What you reuse vs. what you change
+Reuse across all providers
 
-Provide:
-- Provider adapter contract documentation.
-- Sample normalized payloads.
-- Synthetic test fixtures.
-- Contract and integration test commands.
-- Security review findings.
-- A capability matrix showing implemented versus planned adapters.
-- A list of assumptions and unverified provider behavior.
+Adapt for each provider
 
-## Definition of done
+Scenarios and test cases
 
-A developer can submit a documented sample external payload, normalize it through the adapter boundary, pass it to the agreed evaluation workflow, and verify the result through automated tests—without coupling the core engine to a specific voice provider.
+Authentication and connection
 
-The security review must identify remaining risks honestly. Do not claim production readiness or full provider support based only on mocks.
+Deterministic evaluation engine
 
-Commit your work in small increments and push only to `feat/provider-adapters-test-harness`. Do not merge into main.
-write test for each step
+Input message or audio format
+
+LLM-as-judge
+
+Session initialization
+
+Database and evaluation history
+
+Event and tool-call mapping
+
+Reports and dashboard
+
+Error handling and supported capabilities
+
+One important caution: don't assume AssemblyAI, Vapi, and Retell differ only in the name of a text_input field. Verify their supported testing interfaces first. If their input methods differ, isolate that difference in the adapter.
+
+The result is one Novora platform with multiple provider integrations—not four separate implementations.

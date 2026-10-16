@@ -54,7 +54,10 @@ def register_evaluation_routes(
     def create_evaluation(req: EvaluateConversationRequest) -> EvaluationReportResponse:
         scen = scenarios.get(req.scenario_id)
         if not scen:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scenario '{req.scenario_id}' not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Scenario with id '{req.scenario_id}' not found. Cannot evaluate.",
+            )
         report = engine.evaluate(conversation=req.conversation, scenario=scen)
         saved = evaluations.save(report)
         return EvaluationReportResponse.model_validate(saved.model_dump())
