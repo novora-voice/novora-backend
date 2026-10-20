@@ -30,6 +30,7 @@ class RuleSeverity(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+    INFO = "info"
 
 class TestRunStatus(str, Enum):
     __test__ = False

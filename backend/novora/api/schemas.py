@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from novora.core.enums import RuleType
 from novora.core.models import (
     Conversation,
@@ -11,10 +11,28 @@ from novora.core.models import (
 )
 
 class CreateRuleConfigRequest(BaseModel):
-    rule_type: RuleType
+    rule_type: str
     name: Optional[str] = None
     description: Optional[str] = None
     parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_custom_rule_name(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        rule_type = data.get("rule_type")
+        if not isinstance(rule_type, str):
+            return data
+        try:
+            RuleType(rule_type)
+        except ValueError:
+            # The scenario form allows a free-text rule label. Store custom
+            # labels as semantic rubrics while preserving the text for display.
+            data = dict(data)
+            data["name"] = data.get("name") or rule_type
+            data["rule_type"] = RuleType.LLM_SEMANTIC_RUBRIC.value
+        return data
 
 class CreateScenarioRequest(BaseModel):
     name: str = Field(min_length=1, description="Scenario title")

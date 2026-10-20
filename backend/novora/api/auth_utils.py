@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
+from sqlalchemy.pool import StaticPool
 import bcrypt
 
 try:
@@ -54,7 +55,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             pass
     return False
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+if DATABASE_URL.startswith("sqlite"):
+    sqlite_options = {"connect_args": {"check_same_thread": False}}
+    if ":memory:" in DATABASE_URL or DATABASE_URL == "sqlite://":
+        sqlite_options["poolclass"] = StaticPool
+    engine = create_engine(DATABASE_URL, **sqlite_options)
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):

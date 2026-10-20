@@ -1,4 +1,5 @@
 import time
+import uuid
 from typing import Any, Callable, Dict, List, Optional, Set
 from novora.core.exceptions import NovoraError
 from novora.core.execution_models import ToolCallRecord, ToolResultRecord
@@ -13,6 +14,7 @@ class ToolRegistry:
     SENSITIVE_KEYS: Set[str] = {
         "password", "secret", "token", "ssn", "credit_card", "api_key", "pin", "auth"
     }
+    MOCK_SUPPORT_TICKETS: Dict[str, Dict[str, Any]] = {}
 
     def __init__(self, sandbox_mode: bool = True) -> None:
         self.sandbox_mode = sandbox_mode
@@ -139,3 +141,15 @@ class ToolRegistry:
                 "latency_ms": 15,
             },
         )
+        self.register("create_support_ticket", self._create_support_ticket)
+
+    @classmethod
+    def _create_support_ticket(cls, args: Dict[str, Any]) -> Dict[str, Any]:
+        ticket_id = f"TICK-{str(uuid.uuid4())[:8].upper()}"
+        ticket = {
+            "email": args.get("email"),
+            "issue": args.get("issue") or args.get("description"),
+            "status": "Open",
+        }
+        cls.MOCK_SUPPORT_TICKETS[ticket_id] = ticket
+        return {"status": "success", "ticket_id": ticket_id, **ticket}

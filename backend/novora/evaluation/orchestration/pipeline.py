@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-from novora.core.enums import TestRunStatus
+from novora.core.enums import OverallStatus, TestRunStatus
 from novora.core.execution_models import (
     AgentConfig,
     TestCase,
@@ -48,7 +48,7 @@ class CombinedEvaluationPipeline:
             failed_report = EvaluationReport(
                 scenario_id=scenario.id,
                 conversation_id=conversation.id,
-                overall_status=TestRunStatus.FAILED,
+                overall_status=OverallStatus.INCONCLUSIVE,
                 summary=f"Execution Failed: {test_run.error_message}",
                 rule_results=[],
             )

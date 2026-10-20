@@ -45,10 +45,15 @@ class GhostCallerOrchestrator:
             )
             return run, Conversation(scenario_id=test_case.scenario_id, messages=[])
 
+        execution_config = dict(provider_config)
+        execution_config["_tool_executor"] = lambda name, arguments: self._execute_live_tool(
+            name, arguments, agent.permitted_tools
+        )
+
         test_run: TestRun = adapter.execute_test_conversation(
             test_case=test_case,
             agent=agent,
-            config=provider_config,
+            config=execution_config,
         )
 
         # Execute and validate any requested tool calls through ToolRegistry
@@ -65,3 +70,14 @@ class GhostCallerOrchestrator:
         test_run.conversation_id = conversation.id
 
         return test_run, conversation
+
+    def _execute_live_tool(
+        self, name: str, arguments: Dict[str, Any], permitted_tools: list[str]
+    ) -> Dict[str, Any]:
+        from novora.core.execution_models import ToolCallRecord
+
+        call = ToolCallRecord(tool_name=name, arguments=arguments)
+        result = self.tools.execute_tool(call, permitted_list=permitted_tools)
+        if result.success:
+            return result.result
+        return {"error": result.result.get("error", "Tool execution failed.")}

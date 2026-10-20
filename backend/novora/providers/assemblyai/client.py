@@ -1,140 +1,135 @@
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
-from novora.core.execution_models import (
-    NormalizedProviderEvent,
-    ScriptedTurn,
-    ToolCallRecord,
-    ToolResultRecord,
-)
+import json
+import time
+from typing import Any, Dict, List
+from urllib.parse import urlencode
 
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+from websockets.sync.client import connect
+
+from novora.core.execution_models import NormalizedProviderEvent, ScriptedTurn
+from novora.providers.http import request_json
+
 
 class AssemblyAIVoiceAgentClient:
-    """Voice Agent API client using official WebSocket wss://agents.assemblyai.com/v1/ws."""
+    """Runs scripted caller turns against a stored AssemblyAI Voice Agent."""
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        ws_url: str = "wss://agents.assemblyai.com/v1/ws",
-        system_prompt: str = "You are a helpful customer support agent.",
-        tools: Optional[List[Dict[str, Any]]] = None,
+        api_key: str,
+        timeout_seconds: float = 120.0,
     ) -> None:
         self.api_key = api_key
-        self.ws_url = ws_url
-        self.system_prompt = system_prompt
-        self.tools = tools or []
+        self.timeout_seconds = timeout_seconds
 
     def run_agent_session(
         self,
+        agent_id: str,
         scripted_turns: List[ScriptedTurn],
-        tool_executor: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
-        use_audio_input_mode: bool = True,
     ) -> Dict[str, Any]:
-        """Runs a Voice Agent API session using audio input framing."""
-        events: List[NormalizedProviderEvent] = []
-        tool_calls: List[ToolCallRecord] = []
-        tool_results: List[ToolResultRecord] = []
-        seq = 0
-
-        # Session configuration
-        events.append(
-            NormalizedProviderEvent(
-                provider="assemblyai",
-                event_type="session.configured",
-                sequence=seq,
-                payload={
-                    "system_prompt": self.system_prompt,
-                    "tools_count": len(self.tools),
-                    "input_mode": "input.audio" if use_audio_input_mode else "unsupported_text",
-                },
-            )
+        token_response = request_json(
+            "GET",
+            "https://agents.assemblyai.com/v1/token?" + urlencode({
+                "product": "voice_agent",
+                "expires_in_seconds": 60,
+            }),
+            headers={"Authorization": self.api_key},
+            timeout=self.timeout_seconds,
         )
+        token = token_response.get("token")
+        if not token:
+            raise RuntimeError("AssemblyAI did not return a Voice Agent session token.")
 
-        for turn in scripted_turns:
-            seq += 1
-            # User audio frame event
-            events.append(
-                NormalizedProviderEvent(
+        events: List[NormalizedProviderEvent] = []
+        seq = 0
+        ws_url = "wss://agents.assemblyai.com/v1/ws?" + urlencode({"token": token})
+        with connect(
+            ws_url,
+            open_timeout=self.timeout_seconds,
+            close_timeout=5,
+            ping_timeout=self.timeout_seconds,
+        ) as ws:
+            ws.send(json.dumps({"type": "session.update", "session": {"agent_id": agent_id}}))
+            self._receive_until(ws, {"session.ready"}, events, seq)
+
+            for turn in scripted_turns:
+                seq += 1
+                scripted_user_event = NormalizedProviderEvent(
                     provider="assemblyai",
                     event_type="transcript.user",
                     sequence=seq,
-                    payload={"text": turn.user_message, "audio_mode": use_audio_input_mode},
+                    payload={"text": turn.user_message},
                 )
-            )
-
-            # Reply started
-            seq += 1
-            events.append(
-                NormalizedProviderEvent(
-                    provider="assemblyai",
-                    event_type="reply.started",
-                    sequence=seq,
-                    payload={},
-                )
-            )
-
-            # Tool calls if expected
-            for tool_name in turn.expected_tools:
-                seq += 1
-                tc = ToolCallRecord(tool_name=tool_name, arguments={"param": turn.user_message})
-                tool_calls.append(tc)
-                events.append(
-                    NormalizedProviderEvent(
+                events.append(scripted_user_event)
+                # Voice Agent API supports text injection, followed by an explicit
+                # reply.create to make the configured stored agent answer.
+                ws.send(json.dumps({
+                    "type": "conversation.message",
+                    "role": "user",
+                    "content": turn.user_message,
+                }))
+                ws.send(json.dumps({"type": "reply.create"}))
+                response_events = self._receive_until(ws, {"reply.done"}, events, seq)
+                complete_transcripts = [
+                    str(item.get("text", "")).strip()
+                    for item in response_events
+                    if item.get("type") == "transcript.agent" and item.get("text")
+                ]
+                transcript_deltas = [
+                    str(item.get("delta", ""))
+                    for item in response_events
+                    if item.get("type") == "transcript.agent.delta" and item.get("delta")
+                ]
+                reply_text = (
+                    complete_transcripts[-1]
+                    if complete_transcripts
+                    else "".join(transcript_deltas)
+                ).strip()
+                if not reply_text:
+                    raise RuntimeError("AssemblyAI completed the turn without an agent text transcript.")
+                if not complete_transcripts:
+                    events.append(NormalizedProviderEvent(
                         provider="assemblyai",
-                        event_type="tool.call",
-                        sequence=seq,
-                        payload={"call_id": tc.call_id, "name": tool_name},
-                    )
-                )
-
-                res = {"status": "ok"}
-                if tool_executor:
-                    try:
-                        res = tool_executor(tool_name, tc.arguments)
-                        tc.status = "executed"
-                    except Exception as err:
-                        tc.status = "failed"
-                        tc.error = str(err)
-                        res = {"error": str(err)}
-
-                tr = ToolResultRecord(call_id=tc.call_id, tool_name=tool_name, result=res)
-                tool_results.append(tr)
+                        event_type="transcript.agent",
+                        sequence=seq + 1,
+                        payload={"text": reply_text},
+                    ))
                 seq += 1
-                events.append(
-                    NormalizedProviderEvent(
-                        provider="assemblyai",
-                        event_type="tool.result",
-                        sequence=seq,
-                        payload={"call_id": tc.call_id, "output": res},
-                    )
-                )
 
-            # Agent transcript
-            seq += 1
-            agent_msg = f"Acknowledged: {turn.user_message}."
-            events.append(
-                NormalizedProviderEvent(
-                    provider="assemblyai",
-                    event_type="transcript.agent",
-                    sequence=seq,
-                    payload={"text": agent_msg},
-                )
-            )
+            ws.send(json.dumps({"type": "session.end"}))
+            self._receive_until(ws, {"session.ended"}, events, seq)
 
-            # Reply done
-            seq += 1
-            events.append(
-                NormalizedProviderEvent(
-                    provider="assemblyai",
-                    event_type="reply.done",
-                    sequence=seq,
-                    payload={},
-                )
-            )
+        return {"events": events, "tool_calls": [], "tool_results": []}
 
-        return {
-            "events": events,
-            "tool_calls": tool_calls,
-            "tool_results": tool_results,
-        }
+    def _receive_until(
+        self,
+        ws: Any,
+        terminal_types: set[str],
+        events: List[NormalizedProviderEvent],
+        sequence: int,
+    ) -> List[Dict[str, Any]]:
+        received: List[Dict[str, Any]] = []
+        deadline = time.monotonic() + self.timeout_seconds
+        for _ in range(400):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Timed out waiting for AssemblyAI event: {', '.join(sorted(terminal_types))}."
+                )
+            event = json.loads(ws.recv(timeout=remaining))
+            received.append(event)
+            kind = event.get("type", "provider_event")
+            payload = {key: value for key, value in event.items() if key != "data"} if kind == "reply.audio" else event
+            events.append(NormalizedProviderEvent(
+                provider="assemblyai",
+                event_type=kind,
+                sequence=sequence + 1,
+                payload=payload,
+            ))
+            if kind in {"error", "session.error"}:
+                raise RuntimeError(
+                    f"AssemblyAI session error: {event.get('message') or event.get('error') or event}"
+                )
+            if kind in terminal_types:
+                return received
+        raise TimeoutError(
+            f"AssemblyAI did not emit an expected terminal event: {', '.join(sorted(terminal_types))}."
+        )

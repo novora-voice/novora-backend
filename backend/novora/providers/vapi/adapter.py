@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from time import perf_counter
 from uuid import uuid4
 from novora.core.enums import TestRunStatus
 from novora.core.execution_models import (
@@ -9,6 +10,7 @@ from novora.core.execution_models import (
     TestRun,
 )
 from novora.providers.vapi.client import VapiTestClient
+from novora.providers.http import ProviderRequestError, request_json_value
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -23,17 +25,35 @@ class VapiExecutionAdapter:
         return bool(api_key and isinstance(api_key, str) and len(api_key) > 4)
 
     def check_connectivity(self, config: Dict[str, Any]) -> IntegrationHealth:
-        if not self.validate_configuration(config):
+        api_key = config.get("api_key") or config.get("api_key_masked")
+        if not api_key or not isinstance(api_key, str) or len(api_key) <= 4:
             return IntegrationHealth(
                 provider="vapi",
                 is_healthy=False,
                 error="Missing or invalid Vapi API key.",
             )
-        return IntegrationHealth(
-            provider="vapi",
-            is_healthy=True,
-            latency_ms=45.0,
-        )
+        started = perf_counter()
+        try:
+            assistants = request_json_value(
+                "GET",
+                "https://api.vapi.ai/assistant?limit=1",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=15,
+            )
+            if not isinstance(assistants, list):
+                raise ProviderRequestError("Vapi returned an unexpected assistant list response.")
+            return IntegrationHealth(
+                provider="vapi",
+                is_healthy=True,
+                latency_ms=round((perf_counter() - started) * 1000, 2),
+            )
+        except ProviderRequestError as exc:
+            return IntegrationHealth(
+                provider="vapi",
+                is_healthy=False,
+                latency_ms=round((perf_counter() - started) * 1000, 2),
+                error=str(exc),
+            )
 
     def list_or_validate_agents(
         self,

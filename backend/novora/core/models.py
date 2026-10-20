@@ -82,6 +82,8 @@ class RuleResult(BaseModel):
 class EvaluationReport(BaseModel):
     id: str = Field(default_factory=lambda: f"eval_{uuid4().hex[:8]}")
     scenario_id: str
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
     conversation_id: str
     overall_status: OverallStatus
     summary: str
@@ -149,4 +151,3 @@ class RegressionReport(BaseModel):
     rule_comparisons: List[RuleComparison] = Field(default_factory=list)
     summary: str
     created_at: datetime = Field(default_factory=utc_now)
-

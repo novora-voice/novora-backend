@@ -64,7 +64,7 @@ class ElevenLabsExecutionAdapter:
             result = caller.run_conversation_session(
                 agent_id=agent.external_agent_id,
                 scripted_turns=test_case.scripted_turns,
-                simulated=simulated,
+                tool_executor=config.get("_tool_executor"),
             )
             return TestRun(
                 id=run_id,

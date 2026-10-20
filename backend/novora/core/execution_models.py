@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field
 from novora.core.enums import TestRunStatus
+from novora.core.models import EvaluationReport
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -86,6 +87,17 @@ class TestRun(BaseModel):
     started_at: datetime = Field(default_factory=utc_now)
     completed_at: Optional[datetime] = None
 
+class EvaluationJobState(BaseModel):
+    id: str
+    status: str
+    attempt: int = 0
+    error: Optional[str] = None
+    request_data: Dict[str, Any]
+    test_run: Optional[TestRun] = None
+    evaluation_report: Optional[EvaluationReport] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
 class BatchEvaluation(BaseModel):
     id: str = Field(default_factory=lambda: f"batch_{uuid4().hex[:8]}")
     name: str
@@ -104,3 +116,34 @@ class IntegrationHealth(BaseModel):
     latency_ms: Optional[float] = None
     last_checked: datetime = Field(default_factory=utc_now)
     error: Optional[str] = None
+
+
+class HttpToolEndpointConfig(BaseModel):
+    id: str = Field(default_factory=lambda: f"tool_ep_{uuid4().hex[:12]}")
+    name: str
+    provider: str
+    tool_name: str
+    endpoint_url: str
+    method: str = "GET"
+    timeout_ms: int = 3000
+    api_key_masked: str = ""
+    has_auth: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class HttpToolEvaluationResult(BaseModel):
+    id: str = Field(default_factory=lambda: f"tool_eval_{uuid4().hex[:12]}")
+    endpoint_id: str
+    endpoint_name: str
+    provider: str
+    tool_name: str
+    method: str
+    endpoint_url: str
+    request_payload: Dict[str, Any]
+    status_code: Optional[int] = None
+    response_payload: Any = None
+    latency_ms: Optional[float] = None
+    success: bool
+    performance_pass: bool
+    error: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)

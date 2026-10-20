@@ -95,6 +95,9 @@ def test_evaluate_conversation_api_flow(client):
     get_report = client.get(f"/api/v1/evaluations/{eval_id}")
     assert get_report.status_code == 200
     assert get_report.json()["id"] == eval_id
+    get_conversation = client.get("/api/v1/conversations/conv_test_1")
+    assert get_conversation.status_code == 200
+    assert get_conversation.json()["id"] == "conv_test_1"
 
     # 4. List reports by scenario
     list_reports = client.get(f"/api/v1/evaluations?scenario_id={scenario_id}")

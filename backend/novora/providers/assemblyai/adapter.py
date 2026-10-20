@@ -60,13 +60,12 @@ class AssemblyAIExecutionAdapter:
         run_id = f"trun_{uuid4().hex[:8]}"
         client = AssemblyAIVoiceAgentClient(
             api_key=config.get("api_key"),
-            system_prompt=agent.system_prompt or "Support assistant",
         )
 
         try:
             result = client.run_agent_session(
+                agent_id=agent.external_agent_id,
                 scripted_turns=test_case.scripted_turns,
-                use_audio_input_mode=True,
             )
             return TestRun(
                 id=run_id,

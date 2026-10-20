@@ -1,17 +1,16 @@
+import os
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from novora.core.execution_models import (
     AgentConfig,
     IntegrationHealth,
     ProviderConfig,
 )
-from novora.persistence.repositories import InMemoryIntegrationRepository
 from novora.persistence.secrets import SecretManager
 from novora.providers.registry import global_provider_registry
 
 router = APIRouter(tags=["Integrations & Agents"])
-default_integration_repo = InMemoryIntegrationRepository()
 
 class IntegrationCreateRequest(BaseModel):
     provider_name: str
@@ -21,28 +20,59 @@ class IntegrationCreateRequest(BaseModel):
     safe_mode: bool = True
 
 @router.post("/api/v1/integrations", response_model=ProviderConfig, status_code=status.HTTP_201_CREATED)
-def create_integration(req: IntegrationCreateRequest) -> ProviderConfig:
+def create_integration(req: IntegrationCreateRequest, request: Request) -> ProviderConfig:
     """Create or update a provider integration with masked secret storage."""
     masked = SecretManager.mask_secret(req.api_key)
+    provider_name = req.provider_name.lower().strip()
+    existing = request.app.state.integration_repository.get_by_provider(provider_name)
     cfg = ProviderConfig(
-        provider_name=req.provider_name.lower().strip(),
+        provider_name=provider_name,
         api_key_masked=masked,
         base_url=req.base_url,
         timeout_seconds=req.timeout_seconds,
         safe_mode=req.safe_mode,
         metadata={"raw_key": req.api_key},  # kept in-memory for server-side testing
     )
-    return default_integration_repo.save(cfg)
+    if existing:
+        cfg = cfg.model_copy(update={"id": existing.id, "created_at": existing.created_at})
+    saved = request.app.state.integration_repository.save(cfg)
+    return saved.model_copy(update={"metadata": {}})
 
 @router.get("/api/v1/integrations", response_model=List[ProviderConfig])
-def list_integrations() -> List[ProviderConfig]:
-    """List configured provider integrations with masked credentials."""
-    return default_integration_repo.list_all()
+def list_integrations(request: Request) -> List[ProviderConfig]:
+    """List saved and environment-configured providers with masked credentials."""
+    integrations = [
+        config.model_copy(update={"metadata": {}})
+        for config in request.app.state.integration_repository.list_all()
+    ]
+    saved_providers = {config.provider_name.lower() for config in integrations}
+    for provider in ("elevenlabs", "assemblyai", "vapi", "retell"):
+        api_key = os.getenv(f"{provider.upper()}_API_KEY")
+        if api_key and provider not in saved_providers:
+            integrations.append(ProviderConfig(
+                id=f"env_{provider}",
+                provider_name=provider,
+                api_key_masked=SecretManager.mask_secret(api_key),
+                metadata={},
+            ))
+    return integrations
 
 @router.post("/api/v1/integrations/{integration_id}/test-connectivity", response_model=IntegrationHealth)
-def test_connectivity(integration_id: str) -> IntegrationHealth:
+def test_connectivity(integration_id: str, request: Request) -> IntegrationHealth:
     """Tests connectivity to a configured provider."""
-    cfg = default_integration_repo.get(integration_id)
+    cfg = request.app.state.integration_repository.get(integration_id)
+    environment_key = None
+    if cfg is None and integration_id.startswith("env_"):
+        provider_name = integration_id.removeprefix("env_").lower()
+        if provider_name in {"elevenlabs", "assemblyai", "vapi", "retell"}:
+            environment_key = os.getenv(f"{provider_name.upper()}_API_KEY")
+            if environment_key:
+                cfg = ProviderConfig(
+                    id=integration_id,
+                    provider_name=provider_name,
+                    api_key_masked=SecretManager.mask_secret(environment_key),
+                    metadata={},
+                )
     if not cfg:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -55,7 +85,12 @@ def test_connectivity(integration_id: str) -> IntegrationHealth:
             is_healthy=False,
             error=f"No adapter available for provider '{cfg.provider_name}'.",
         )
-    raw_key = cfg.metadata.get("raw_key") or cfg.api_key_masked
+    raw_key = cfg.metadata.get("raw_key") or environment_key
+    if not raw_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Provider credential is unavailable; reconnect this integration.",
+        )
     return adapter.check_connectivity({"api_key": raw_key})
 
 @router.get("/api/v1/agents", response_model=List[AgentConfig])
