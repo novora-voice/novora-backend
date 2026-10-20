@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from functools import lru_cache
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import and_, create_engine, inspect, or_, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from novora.adapters.db_models import (
@@ -73,6 +73,22 @@ class DatabaseSessionManager:
             if "agent_name" not in columns:
                 connection.execute(
                     text("ALTER TABLE evaluation_reports ADD COLUMN agent_name VARCHAR(255)")
+                )
+            if "test_run_id" not in columns:
+                connection.execute(
+                    text("ALTER TABLE evaluation_reports ADD COLUMN test_run_id VARCHAR(64)")
+                )
+            if "scenario_fingerprint" not in columns:
+                connection.execute(
+                    text("ALTER TABLE evaluation_reports ADD COLUMN scenario_fingerprint VARCHAR(64)")
+                )
+            if "expected_rule_ids" not in columns:
+                connection.execute(
+                    text("ALTER TABLE evaluation_reports ADD COLUMN expected_rule_ids TEXT DEFAULT '[]'")
+                )
+            if "integrity_issues" not in columns:
+                connection.execute(
+                    text("ALTER TABLE evaluation_reports ADD COLUMN integrity_issues TEXT DEFAULT '[]'")
                 )
 
     def get_session(self) -> Session:
@@ -205,7 +221,7 @@ class SQLAlchemyIntegrationRepository(SQLAlchemyRecordRepository[ProviderConfig]
     def _cipher() -> Fernet:
         secret = os.environ.get(
             "NOVORA_SECRET_ENCRYPTION_KEY",
-            os.environ.get("NOVORA_JWT_SECRET", "novora-super-secret-key-CHANGE-IN-PRODUCTION"),
+            os.environ["NOVORA_JWT_SECRET"],
         )
         key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest())
         return Fernet(key)
@@ -475,6 +491,10 @@ class SQLAlchemyEvaluationRepository:
                 agent_id=report.agent_id,
                 agent_name=report.agent_name,
                 conversation_id=report.conversation_id,
+                test_run_id=report.test_run_id,
+                scenario_fingerprint=report.scenario_fingerprint,
+                expected_rule_ids=json.dumps(report.expected_rule_ids),
+                integrity_issues=json.dumps(report.integrity_issues),
                 overall_status=report.overall_status.value,
                 summary=report.summary,
                 rule_results=json.dumps([r.model_dump() for r in report.rule_results]),
@@ -500,6 +520,10 @@ class SQLAlchemyEvaluationRepository:
                 agent_id=row.agent_id,
                 agent_name=row.agent_name,
                 conversation_id=row.conversation_id,
+                test_run_id=row.test_run_id,
+                scenario_fingerprint=row.scenario_fingerprint,
+                expected_rule_ids=json.loads(row.expected_rule_ids or "[]"),
+                integrity_issues=json.loads(row.integrity_issues or "[]"),
                 overall_status=OverallStatus(row.overall_status),
                 summary=row.summary,
                 rule_results=rules,
@@ -530,6 +554,10 @@ class SQLAlchemyEvaluationRepository:
                         agent_id=row.agent_id,
                         agent_name=row.agent_name,
                         conversation_id=row.conversation_id,
+                        test_run_id=row.test_run_id,
+                        scenario_fingerprint=row.scenario_fingerprint,
+                        expected_rule_ids=json.loads(row.expected_rule_ids or "[]"),
+                        integrity_issues=json.loads(row.integrity_issues or "[]"),
                         overall_status=OverallStatus(row.overall_status),
                         summary=row.summary,
                         rule_results=rules,
@@ -541,3 +569,53 @@ class SQLAlchemyEvaluationRepository:
                     )
                 )
             return result
+
+    def list_by_agent(
+        self,
+        agent_id: Optional[str],
+        agent_name: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[EvaluationReport]:
+        with self.sm.get_session() as session:
+            identity_filters = []
+            if agent_id:
+                identity_filters.append(DBEvaluationReport.agent_id == agent_id)
+            if agent_name:
+                # Name fallback is restricted to legacy reports without an agent ID.
+                name_filter = DBEvaluationReport.agent_name == agent_name
+                identity_filters.append(
+                    and_(DBEvaluationReport.agent_id.is_(None), name_filter) if agent_id else name_filter
+                )
+            if not identity_filters:
+                return []
+            rows = (
+                session.query(DBEvaluationReport)
+                .filter(or_(*identity_filters))
+                .order_by(DBEvaluationReport.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+            return [
+                EvaluationReport(
+                    id=row.id,
+                    scenario_id=row.scenario_id,
+                    agent_id=row.agent_id,
+                    agent_name=row.agent_name,
+                    conversation_id=row.conversation_id,
+                    test_run_id=row.test_run_id,
+                    scenario_fingerprint=row.scenario_fingerprint,
+                    expected_rule_ids=json.loads(row.expected_rule_ids or "[]"),
+                    integrity_issues=json.loads(row.integrity_issues or "[]"),
+                    overall_status=OverallStatus(row.overall_status),
+                    summary=row.summary,
+                    rule_results=[RuleResult(**item) for item in json.loads(row.rule_results)],
+                    total_rules=row.total_rules,
+                    passed_rules=row.passed_rules,
+                    failed_rules=row.failed_rules,
+                    inconclusive_rules=row.inconclusive_rules,
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ]

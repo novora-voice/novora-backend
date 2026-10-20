@@ -20,7 +20,7 @@ class EvaluationAggregator:
         combined_rule_results: List[RuleResult] = list(deterministic_results)
 
         # Incorporate judge verdicts as semantic rule results
-        if judge_result and judge_result.is_available:
+        if judge_result:
             for verdict in judge_result.verdicts:
                 combined_rule_results.append(
                     RuleResult(
@@ -39,7 +39,11 @@ class EvaluationAggregator:
                             for cid in verdict.evidence_citations
                         ],
 
-                        details={"confidence": verdict.confidence, "model": judge_result.model_name},
+                        details={
+                            "confidence": verdict.confidence,
+                            "model": judge_result.model_name,
+                            **({"judge_error": judge_result.error_message} if judge_result.error_message else {}),
+                        },
                     )
                 )
 
@@ -53,6 +57,7 @@ class EvaluationAggregator:
 
         failed_count = sum(1 for r in combined_rule_results if r.status == RuleStatus.FAIL)
         inconclusive_count = sum(1 for r in combined_rule_results if r.status == RuleStatus.INCONCLUSIVE)
+        not_evaluated_count = sum(1 for r in combined_rule_results if r.status == RuleStatus.NOT_EVALUATED)
         passed_count = sum(1 for r in combined_rule_results if r.status == RuleStatus.PASS)
         total_count = len(combined_rule_results)
 
@@ -62,10 +67,11 @@ class EvaluationAggregator:
                 f"Evaluation FAILED: {failed_count} rule(s) failed out of {total_count}. "
                 f"Critical safety enforcement active. ({passed_count} passed, {inconclusive_count} inconclusive)."
             )
-        elif inconclusive_count > 0:
+        elif inconclusive_count > 0 or not_evaluated_count > 0:
             overall = OverallStatus.INCONCLUSIVE
             summary = (
-                f"Evaluation INCONCLUSIVE: {inconclusive_count} of {total_count} criteria had insufficient evidence. "
+                f"Evaluation INCONCLUSIVE: {inconclusive_count} criterion/criteria lacked evidence and "
+                f"{not_evaluated_count} were not evaluated out of {total_count}. "
                 f"({passed_count} passed, 0 failed)."
             )
         else:

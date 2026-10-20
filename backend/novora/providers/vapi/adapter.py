@@ -60,7 +60,9 @@ class VapiExecutionAdapter:
         config: Dict[str, Any],
         agent_id: Optional[str] = None,
     ) -> List[AgentConfig]:
-        target_id = agent_id or config.get("assistant_id") or "asst_vapi_default"
+        target_id = agent_id or config.get("assistant_id")
+        if not target_id:
+            return []
         return [
             AgentConfig(
                 provider_name="vapi",

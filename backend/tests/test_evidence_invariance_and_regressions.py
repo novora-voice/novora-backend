@@ -6,6 +6,7 @@ Guarantees:
 3. Deterministic idempotency: evaluating the same conversation multiple times
    yields identical reports, statuses, and evidence references.
 """
+import json
 
 from novora.core.enums import MessageRole, OverallStatus, RuleStatus, RuleType
 from novora.core.models import (
@@ -45,10 +46,31 @@ def test_missing_evidence_cannot_produce_pass():
     assert report.overall_status in (OverallStatus.FAIL, OverallStatus.INCONCLUSIVE)
 
     info_result = next(r for r in report.rule_results if r.rule_type == RuleType.REQUIRED_INFORMATION)
-    assert info_result.status == RuleStatus.FAIL
+    assert info_result.status == RuleStatus.INCONCLUSIVE
 
     policy_result = next(r for r in report.rule_results if r.rule_type == RuleType.POLICY_COMPLIANCE)
     assert policy_result.status == RuleStatus.INCONCLUSIVE
+
+
+def test_legacy_stringified_required_information_config_is_normalized():
+    scenario = EvaluationScenario(
+        id="scen_legacy_rule_config",
+        name="Legacy Rule Configuration",
+        business_goal="Collect an order ID",
+        rules=[RuleConfig(
+            id="rule_legacy_order",
+            rule_type=RuleType.REQUIRED_INFORMATION,
+            name="Required order identifier",
+            parameters={"required_fields": [json.dumps({"required_fields": ["order_id"]})]},
+        )],
+    )
+    conversation = Conversation(messages=[
+        ConversationMessage(role=MessageRole.CUSTOMER, content="My order number is ORD-78421", sequence=0),
+    ])
+
+    report = EvaluationEngine().evaluate(conversation, scenario)
+
+    assert report.rule_results[0].status == RuleStatus.PASS
 
 def test_unsupported_action_claims_flagged_with_exact_evidence_span():
     """Verify that verbal claims without backend action records are flagged with exact span."""

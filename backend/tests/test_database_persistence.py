@@ -63,6 +63,10 @@ def test_sqlalchemy_evaluation_repository():
         agent_id="agent_db_01",
         agent_name="Persisted Agent",
         conversation_id="conv_01",
+        test_run_id="trun_01",
+        scenario_fingerprint="scenario-fingerprint-v1",
+        expected_rule_ids=["r1", "judge_tone"],
+        integrity_issues=["Transcript was unavailable during the original run."],
         overall_status=OverallStatus.PASS,
         summary="Persisted report summary",
         created_at=datetime(2024, 1, 1),
@@ -83,6 +87,10 @@ def test_sqlalchemy_evaluation_repository():
     assert fetched.overall_status == OverallStatus.PASS
     assert fetched.agent_id == "agent_db_01"
     assert fetched.agent_name == "Persisted Agent"
+    assert fetched.test_run_id == "trun_01"
+    assert fetched.scenario_fingerprint == "scenario-fingerprint-v1"
+    assert fetched.expected_rule_ids == ["r1", "judge_tone"]
+    assert fetched.integrity_issues == ["Transcript was unavailable during the original run."]
     assert len(fetched.rule_results) == 1
     assert fetched.rule_results[0].rule_name == "Check account id"
 
@@ -100,6 +108,7 @@ def test_sqlalchemy_evaluation_repository():
     assert [item.id for item in listed] == ["rep_db_02", "rep_db_01"]
     assert listed[0].agent_id == "agent_db_01"
     assert listed[0].agent_name == "Persisted Agent"
+    assert repo.list_by_agent("agent_db_01", limit=1)[0].id == "rep_db_02"
 
 def test_database_manager_adds_agent_columns_to_existing_evaluation_table(tmp_path):
     db_path = tmp_path / "legacy.db"
@@ -127,7 +136,7 @@ def test_database_manager_adds_agent_columns_to_existing_evaluation_table(tmp_pa
         column["name"]
         for column in inspect(manager.engine).get_columns("evaluation_reports")
     }
-    assert {"agent_id", "agent_name"} <= column_names
+    assert {"agent_id", "agent_name", "test_run_id", "scenario_fingerprint", "expected_rule_ids", "integrity_issues"} <= column_names
 
 def test_sqlalchemy_telephony_and_webhook_repositories():
     sm = DatabaseSessionManager("sqlite:///:memory:")

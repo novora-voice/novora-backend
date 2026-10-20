@@ -40,7 +40,9 @@ class ElevenLabsExecutionAdapter:
         config: Dict[str, Any],
         agent_id: Optional[str] = None,
     ) -> List[AgentConfig]:
-        target_id = agent_id or config.get("agent_id") or "agent_el_default"
+        target_id = agent_id or config.get("agent_id")
+        if not target_id:
+            return []
         return [
             AgentConfig(
                 provider_name="elevenlabs",
@@ -57,14 +59,15 @@ class ElevenLabsExecutionAdapter:
         config: Dict[str, Any],
     ) -> TestRun:
         run_id = f"trun_{uuid4().hex[:8]}"
-        caller = ElevenLabsGhostCaller(api_key=config.get("api_key"))
-        simulated = config.get("simulated", True)
+        caller = ElevenLabsGhostCaller(api_key=config.get("api_key") or "")
+        simulated = config.get("simulated", not bool(config.get("api_key")))
 
         try:
             result = caller.run_conversation_session(
                 agent_id=agent.external_agent_id,
                 scripted_turns=test_case.scripted_turns,
                 tool_executor=config.get("_tool_executor"),
+                simulated=simulated,
             )
             return TestRun(
                 id=run_id,

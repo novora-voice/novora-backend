@@ -32,15 +32,23 @@ class LLMJudgeService:
         scenario: EvaluationScenario,
         rubrics: Optional[List[RubricCriterion]] = None,
     ) -> LLMJudgeResult:
+        active_rubrics = rubrics or get_rubrics_for_scenario(scenario.name)
         if not self.is_available():
             return LLMJudgeResult(
                 model_name=self.model_name,
                 is_available=False,
                 error_message="LLM Judge is unavailable: No LLM provider API key configured.",
-                verdicts=[],
+                verdicts=[
+                    LLMJudgeVerdict(
+                        criterion_id=r.criterion_id,
+                        status=RuleStatus.NOT_EVALUATED,
+                        confidence=0.0,
+                        rationale="Judge criteria were not evaluated because the judge is unavailable.",
+                    )
+                    for r in active_rubrics
+                ],
             )
 
-        active_rubrics = rubrics or get_rubrics_for_scenario(scenario.name)
         sanitized_prompt_evidence = UntrustedTranscriptSanitizer.format_untrusted_transcript(conversation)
         verdicts: List[LLMJudgeVerdict] = []
 

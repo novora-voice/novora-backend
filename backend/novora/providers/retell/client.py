@@ -1,19 +1,111 @@
 import time
 from typing import Any, Dict, List
 
-from novora.core.execution_models import NormalizedProviderEvent, ScriptedTurn
+from novora.core.execution_models import NormalizedProviderEvent, ScriptedTurn, ToolCallRecord, ToolResultRecord
 from novora.providers.http import request_json
 
 
 class RetellTestClient:
     """Runs a real Retell batch simulation test for a deployed agent."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.retellai.com", timeout_seconds: float = 300.0) -> None:
-        self.api_key = api_key
+    def __init__(self, api_key: str = "", base_url: str = "https://api.retellai.com", timeout_seconds: float = 300.0, **_: Any) -> None:
+        self.api_key = api_key or ""
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 
-    def run_web_call_simulation(self, agent_id: str, scripted_turns: List[ScriptedTurn], **_: Any) -> Dict[str, Any]:
+    def run_web_call_simulation(
+        self,
+        agent_id: str,
+        scripted_turns: List[ScriptedTurn],
+        tool_executor: Any = None,
+        simulated: bool = False,
+        **_: Any,
+    ) -> Dict[str, Any]:
+        if simulated or not self.api_key:
+            events: List[NormalizedProviderEvent] = []
+            tool_calls: List[ToolCallRecord] = []
+            tool_results: List[ToolResultRecord] = []
+            seq = 0
+            events.append(
+                NormalizedProviderEvent(
+                    provider="retell",
+                    event_type="call_started",
+                    sequence=seq,
+                    payload={"agent_id": agent_id, "call_type": "web_call"},
+                )
+            )
+
+            for turn in scripted_turns:
+                seq += 1
+                events.append(
+                    NormalizedProviderEvent(
+                        provider="retell",
+                        event_type="transcript_utterance",
+                        sequence=seq,
+                        payload={"role": "user", "content": turn.user_message},
+                    )
+                )
+
+                for tool_name in turn.expected_tools:
+                    seq += 1
+                    tc = ToolCallRecord(tool_name=tool_name, arguments={"arg": turn.user_message})
+                    tool_calls.append(tc)
+                    events.append(
+                        NormalizedProviderEvent(
+                            provider="retell",
+                            event_type="tool_invocation",
+                            sequence=seq,
+                            payload={"tool_name": tool_name, "call_id": tc.call_id},
+                        )
+                    )
+
+                    res = {"status": "success"}
+                    if tool_executor:
+                        try:
+                            res = tool_executor(tool_name, tc.arguments)
+                            tc.status = "executed"
+                        except Exception as err:
+                            tc.status = "failed"
+                            tc.error = str(err)
+                            res = {"error": str(err)}
+
+                    tr = ToolResultRecord(call_id=tc.call_id, tool_name=tool_name, result=res)
+                    tool_results.append(tr)
+                    seq += 1
+                    events.append(
+                        NormalizedProviderEvent(
+                            provider="retell",
+                            event_type="tool_response",
+                            sequence=seq,
+                            payload={"call_id": tc.call_id, "result": res},
+                        )
+                    )
+
+                seq += 1
+                events.append(
+                    NormalizedProviderEvent(
+                        provider="retell",
+                        event_type="transcript_utterance",
+                        sequence=seq,
+                        payload={"role": "agent", "content": f"Retell Agent: I received '{turn.user_message}'."},
+                    )
+                )
+
+            seq += 1
+            events.append(
+                NormalizedProviderEvent(
+                    provider="retell",
+                    event_type="call_ended",
+                    sequence=seq,
+                    payload={"disconnection_reason": "user_hangup", "total_turns": len(scripted_turns)},
+                )
+            )
+
+            return {
+                "events": events,
+                "tool_calls": tool_calls,
+                "tool_results": tool_results,
+            }
         headers = {"Authorization": f"Bearer {self.api_key}"}
         agent = request_json("GET", f"{self.base_url}/get-agent/{agent_id}", headers=headers)
         engine = agent.get("response_engine")

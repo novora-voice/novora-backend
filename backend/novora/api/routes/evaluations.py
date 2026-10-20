@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from fastapi import FastAPI, HTTPException, Query, status
 from novora.api.schemas import (
     CompareEvaluationsRequest,
@@ -71,8 +71,22 @@ def register_evaluation_routes(
         return EvaluationReportResponse.model_validate(report.model_dump())
 
     @app.get("/api/v1/evaluations", response_model=List[EvaluationReportResponse], tags=["Evaluations"])
-    def list_evaluation_reports(scenario_id: str = Query(...), limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0)) -> List[EvaluationReportResponse]:
-        reports = evaluations.list_by_scenario(scenario_id=scenario_id, limit=limit, offset=offset)
+    def list_evaluation_reports(
+        scenario_id: Optional[str] = Query(None),
+        agent_id: Optional[str] = Query(None),
+        agent_name: Optional[str] = Query(None),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> List[EvaluationReportResponse]:
+        if scenario_id:
+            reports = evaluations.list_by_scenario(scenario_id=scenario_id, limit=limit, offset=offset)
+        elif agent_id or agent_name:
+            reports = evaluations.list_by_agent(agent_id=agent_id, agent_name=agent_name, limit=limit, offset=offset)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Provide scenario_id, agent_id, or agent_name to list evaluation reports.",
+            )
         return [EvaluationReportResponse.model_validate(r.model_dump()) for r in reports]
 
     @app.get("/api/v1/scenarios/{scenario_id}/history", response_model=List[EvaluationReportResponse], tags=["Evaluations"])
@@ -86,5 +100,40 @@ def register_evaluation_routes(
         cand_rep = evaluations.get(req.candidate_evaluation_id)
         if not base_rep or not cand_rep:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Baseline or candidate evaluation not found.")
+        run_repository = getattr(app.state, "test_run_repository", None)
+
+        def validate_saved_evidence(report: Any, label: str) -> Any:
+            issues = list(report.integrity_issues)
+            conversation = conversations.get(report.conversation_id)
+            if conversation is None:
+                issues.append(f"{label} transcript {report.conversation_id} is missing from persistence.")
+            elif not conversation.messages:
+                issues.append(f"{label} transcript {report.conversation_id} has no persisted messages.")
+            else:
+                message_ids = {message.id for message in conversation.messages}
+                dangling = {
+                    evidence.message_id
+                    for result in report.rule_results
+                    for evidence in result.evidence
+                    if evidence.message_id not in message_ids
+                }
+                if dangling:
+                    issues.append(f"{label} has {len(dangling)} evidence reference(s) missing from its transcript.")
+
+            if report.test_run_id:
+                run = run_repository.get(report.test_run_id) if run_repository else None
+                if run is None:
+                    issues.append(f"{label} test run {report.test_run_id} is missing from persistence.")
+                else:
+                    if run.evaluation_id != report.id:
+                        issues.append(f"{label} test run does not point back to evaluation {report.id}.")
+                    if run.conversation_id != report.conversation_id:
+                        issues.append(f"{label} test run and evaluation reference different transcripts.")
+                    if run.scenario_id != report.scenario_id:
+                        issues.append(f"{label} test run and evaluation reference different scenarios.")
+            return report.model_copy(update={"integrity_issues": issues})
+
+        base_rep = validate_saved_evidence(base_rep, "Baseline")
+        cand_rep = validate_saved_evidence(cand_rep, "Candidate")
         diff = EvaluationComparator.compare(baseline=base_rep, candidate=cand_rep)
         return RegressionReportResponse.model_validate(diff.model_dump())

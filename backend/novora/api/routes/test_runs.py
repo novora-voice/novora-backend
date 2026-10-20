@@ -20,6 +20,7 @@ from novora.core.execution_models import (
     TestRun,
 )
 from novora.core.models import EvaluationReport, EvaluationScenario
+from novora.core.judge_models import RubricCriterion
 from novora.adapters.database import (
     SQLAlchemyConversationRepository,
     SQLAlchemyEvaluationRepository,
@@ -101,6 +102,7 @@ class TestRunExecutionRequest(BaseModel):
     agent: AgentConfig
     provider_config: Dict[str, Any] = {}
     enable_llm_judge: bool = True
+    llm_rubrics: Optional[List[RubricCriterion]] = None
     # User-defined test instructions in plain English
     user_instructions: Optional[str] = None
     # Custom scripted turns override
@@ -180,8 +182,8 @@ def _execute_test_run(
     provider_config.pop("api_key", None)
     provider_config.pop("elevenlabs_tts_api_key", None)
     provider_config.pop("elevenlabs_tts_voice_id", None)
+    provider = req.agent.provider_name.lower()
     if not provider_config.get("api_key"):
-        provider = req.agent.provider_name.lower()
         env_keys = {
             "elevenlabs": "ELEVENLABS_API_KEY",
             "assemblyai": "ASSEMBLYAI_API_KEY",
@@ -204,12 +206,15 @@ def _execute_test_run(
         agent=req.agent,
         provider_config=provider_config,
         enable_llm_judge=req.enable_llm_judge,
+        llm_rubrics=req.llm_rubrics,
     )
     if run.status.value == "failed":
         error_message = run.error_message or f"{req.agent.provider_name} provider execution failed."
         if _is_provider_owner_action_error(error_message):
             report.agent_id = agent_id
             report.agent_name = req.agent.name.strip()
+            report.test_run_id = run.id
+            run.evaluation_id = report.id
             if req.agent.provider_name.lower() == "vapi":
                 report.summary = _vapi_blocked_summary(error_message)
             conversation_repository.save(_conv)
@@ -223,6 +228,8 @@ def _execute_test_run(
         raise RuntimeError(error_message)
     report.agent_id = agent_id
     report.agent_name = req.agent.name.strip()
+    report.test_run_id = run.id
+    run.evaluation_id = report.id
     conversation_repository.save(_conv)
     evaluation_repository.save(report)
     test_run_repository.save(run)
@@ -354,6 +361,10 @@ async def enqueue_test_run(req: TestRunExecutionRequest, request: Request) -> Ev
             detail={"code": "AGENT_ID_REQUIRED", "message": "An agent ID is required before running an evaluation."},
         )
 
+    # Persist selected templates and wizard-created scenarios before queue checks so
+    # the scenario remains available even if the evaluation queue is unavailable.
+    request.app.state.scenario_repository.save(req.scenario)
+
     redis: Optional[ArqRedis] = getattr(request.app.state, "evaluation_redis", None)
     worker_task = getattr(request.app.state, "evaluation_worker_task", None)
     if redis is None or worker_task is None or worker_task.done():
@@ -362,7 +373,6 @@ async def enqueue_test_run(req: TestRunExecutionRequest, request: Request) -> Ev
             detail="Evaluation queue worker is unavailable. Check Redis and backend startup logs, then restart the backend.",
         )
 
-    request.app.state.scenario_repository.save(req.scenario)
     job_id = f"evaljob_{uuid4().hex}"
     request_data = req.model_dump(mode="json")
     request_data.get("provider_config", {}).pop("api_key", None)

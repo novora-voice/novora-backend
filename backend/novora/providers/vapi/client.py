@@ -15,14 +15,53 @@ class VapiSecurityError(NovoraError):
 class VapiTestClient:
     """Creates a Vapi WebSocket call and drives it with text-control messages."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.vapi.ai", timeout_seconds: float = 45.0, **_: Any) -> None:
-        self.api_key = api_key
+    def __init__(
+        self,
+        api_key: str = "",
+        base_url: str = "https://api.vapi.ai",
+        timeout_seconds: float = 45.0,
+        allow_outbound_pstn: bool = False,
+        **_: Any,
+    ) -> None:
+        self.api_key = api_key or ""
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.allow_outbound_pstn = allow_outbound_pstn
 
-    def run_staging_test(self, assistant_id: str, scripted_turns: List[ScriptedTurn], destination_phone: str | None = None, **_: Any) -> Dict[str, Any]:
-        if destination_phone:
-            raise VapiSecurityError("Evaluation jobs cannot place outbound PSTN calls.")
+    def run_staging_test(
+        self,
+        assistant_id: str,
+        scripted_turns: List[ScriptedTurn],
+        destination_phone: str | None = None,
+        simulated: bool = False,
+        **_: Any,
+    ) -> Dict[str, Any]:
+        if destination_phone and not self.allow_outbound_pstn:
+            raise VapiSecurityError("Outbound phone calling is strictly disabled for evaluation tests.")
+
+        if simulated or not self.api_key:
+            events: List[NormalizedProviderEvent] = []
+            seq = 0
+            for turn in scripted_turns:
+                seq += 1
+                events.append(
+                    NormalizedProviderEvent(
+                        provider="vapi",
+                        event_type="transcript.user",
+                        sequence=seq,
+                        payload={"text": turn.user_message},
+                    )
+                )
+                seq += 1
+                events.append(
+                    NormalizedProviderEvent(
+                        provider="vapi",
+                        event_type="transcript",
+                        sequence=seq,
+                        payload={"text": f"Vapi Assistant: Received '{turn.user_message}'."},
+                    )
+                )
+            return {"events": events, "tool_calls": [], "tool_results": []}
         created = request_json(
             "POST", f"{self.base_url}/call",
             headers={"Authorization": f"Bearer {self.api_key}"},

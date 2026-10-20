@@ -138,7 +138,6 @@ def create_app(
     if scenario_repo is None and not scenarios.list_all(limit=1):
         for scenario in InMemoryScenarioRepository(seed_defaults=True).list_all(limit=100):
             scenarios.save(scenario)
-
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:

@@ -33,6 +33,7 @@ from novora.evaluation.rules.tool_rules import (
     ToolArgumentValidationRule,
     ToolCallOrderingRule,
 )
+from novora.evaluation.scenario_identity import fingerprint_scenario
 
 class EvaluationEngine:
     """Orchestrates deterministic rule evaluations and generates traceable reports."""
@@ -76,6 +77,17 @@ class EvaluationEngine:
         rule_results: List[RuleResult] = []
 
         for rule_cfg in scenario.rules:
+            if not conversation.messages:
+                result = RuleResult(
+                    rule_id=rule_cfg.id,
+                    rule_name=rule_cfg.name or str(rule_cfg.rule_type.value),
+                    rule_type=rule_cfg.rule_type,
+                    status=RuleStatus.INCONCLUSIVE,
+                    explanation="No transcript messages are available to evaluate this rule.",
+                    evidence=[],
+                )
+                rule_results.append(result)
+                continue
             evaluator = self._evaluators.get(rule_cfg.rule_type)
             if not evaluator:
                 # Unregistered rule type treated as INCONCLUSIVE
@@ -83,17 +95,28 @@ class EvaluationEngine:
                     rule_id=rule_cfg.id,
                     rule_name=rule_cfg.name or str(rule_cfg.rule_type.value),
                     rule_type=rule_cfg.rule_type,
-                    status=RuleStatus.INCONCLUSIVE,
+                    status=RuleStatus.NOT_EVALUATED,
                     explanation=f"No evaluator registered for rule type '{rule_cfg.rule_type}'.",
                     evidence=[],
                 )
             else:
-                result = evaluator.evaluate(rule_cfg, conversation, scenario)
+                try:
+                    result = evaluator.evaluate(rule_cfg, conversation, scenario)
+                except Exception as exc:
+                    result = RuleResult(
+                        rule_id=rule_cfg.id,
+                        rule_name=rule_cfg.name or str(rule_cfg.rule_type.value),
+                        rule_type=rule_cfg.rule_type,
+                        status=RuleStatus.NOT_EVALUATED,
+                        explanation=f"Rule evaluation could not complete: {type(exc).__name__}: {exc}",
+                        evidence=[],
+                    )
             rule_results.append(result)
 
         # Aggregate overall status
         failed_count = sum(1 for r in rule_results if r.status == RuleStatus.FAIL)
         inconclusive_count = sum(1 for r in rule_results if r.status == RuleStatus.INCONCLUSIVE)
+        not_evaluated_count = sum(1 for r in rule_results if r.status == RuleStatus.NOT_EVALUATED)
         passed_count = sum(1 for r in rule_results if r.status == RuleStatus.PASS)
         total_count = len(rule_results)
 
@@ -103,10 +126,11 @@ class EvaluationEngine:
                 f"Evaluation FAILED: {failed_count} of {total_count} rule(s) failed. "
                 f"({passed_count} passed, {inconclusive_count} inconclusive)."
             )
-        elif inconclusive_count > 0:
+        elif inconclusive_count > 0 or not_evaluated_count > 0:
             overall = OverallStatus.INCONCLUSIVE
             summary = (
-                f"Evaluation INCONCLUSIVE: {inconclusive_count} of {total_count} rule(s) lacked sufficient evidence. "
+                f"Evaluation INCONCLUSIVE: {inconclusive_count} rule(s) lacked sufficient evidence and "
+                f"{not_evaluated_count} were not evaluated out of {total_count}. "
                 f"({passed_count} passed, 0 failed)."
             )
         else:
@@ -118,6 +142,8 @@ class EvaluationEngine:
         report = EvaluationReport(
             scenario_id=scenario.id,
             conversation_id=conversation.id,
+            scenario_fingerprint=fingerprint_scenario(scenario),
+            expected_rule_ids=[rule.id for rule in scenario.rules],
             overall_status=overall,
             summary=summary,
             rule_results=rule_results,

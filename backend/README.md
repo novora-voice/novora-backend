@@ -82,6 +82,23 @@ python -m uvicorn novora.api.main:app --app-dir . --reload --port 8000
 
 Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
 
+### Deploy with Docker on Render
+
+Create a Render Web Service from this repository, select the Docker runtime,
+and use `Dockerfile` at the repository root. The container listens on Render's
+`PORT` (default `10000`) on `0.0.0.0`.
+
+Configure these environment variables in Render before the first deploy:
+
+- `NOVORA_DATABASE_URL`: the internal connection URL for a Render PostgreSQL database.
+- `REDIS_URL`: the internal connection URL for a Render Key Value instance.
+- `NOVORA_JWT_SECRET`: a long, random secret used to sign login tokens.
+- `NOVORA_SECRET_ENCRYPTION_KEY`: a long, random, stable secret used to encrypt provider credentials.
+
+Keep the encryption key stable across deploys; changing it makes stored
+provider credentials unreadable. The web service needs network access to both
+PostgreSQL and Key Value.
+
 ### API Endpoints
 
 - `POST /api/v1/scenarios` — Register a business evaluation scenario with rules.

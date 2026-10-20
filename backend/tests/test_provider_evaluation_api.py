@@ -27,6 +27,37 @@ def test_list_providers_and_capabilities(client):
     assert cap_res.status_code == 200
     assert "programmatic_ghost_caller" in cap_res.json()["supported_capabilities"]
 
+def test_agent_lookup_never_returns_a_fake_default_target(client):
+    for provider in ("elevenlabs", "assemblyai", "vapi", "retell"):
+        response = client.get("/api/v1/agents", params={"provider": provider})
+        assert response.status_code == 200
+        assert response.json() == []
+
+        configured = client.get("/api/v1/agents", params={"provider": provider, "agent_id": "configured-agent-42"})
+        assert configured.status_code == 200
+        assert configured.json()[0]["external_agent_id"] == "configured-agent-42"
+
+def test_evaluation_queue_saves_scenario_even_when_queue_is_unavailable(client):
+    scenario = create_customer_support_template().model_copy(update={
+        "id": "scen_queue_unavailable_persisted",
+        "name": "Saved before queue submission",
+    })
+    client.app.state.evaluation_redis = None
+    response = client.post("/api/v1/test-runs/jobs", json={
+        "scenario": scenario.model_dump(mode="json"),
+        "agent": {
+            "provider_name": "elevenlabs",
+            "external_agent_id": "agent_test_42",
+            "name": "ElevenLabs Test Agent",
+        },
+        "provider_config": {},
+        "user_instructions": "Check the customer's order status.",
+    })
+    assert response.status_code == 503
+    saved = client.get(f"/api/v1/scenarios/{scenario.id}")
+    assert saved.status_code == 200
+    assert saved.json()["name"] == scenario.name
+
 def test_integrations_and_connectivity(client):
     payload = {
         "provider_name": "elevenlabs",
@@ -109,7 +140,7 @@ def test_test_run_execution_and_retrieval(client, monkeypatch):
     }
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test-key-not-used")
 
-    def fake_run_pipeline(scenario, test_case, agent, provider_config, enable_llm_judge=True):
+    def fake_run_pipeline(scenario, test_case, agent, provider_config, enable_llm_judge=True, llm_rubrics=None):
         conversation = Conversation(scenario_id=scenario.id)
         report = EvaluationReport(
             scenario_id=scenario.id,

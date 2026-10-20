@@ -29,6 +29,10 @@ class DBEvaluationReport(Base):
     agent_id = Column(String(255), nullable=True)
     agent_name = Column(String(255), nullable=True)
     conversation_id = Column(String(64), nullable=False, index=True)
+    test_run_id = Column(String(64), nullable=True, index=True)
+    scenario_fingerprint = Column(String(64), nullable=True)
+    expected_rule_ids = Column(Text, default="[]")
+    integrity_issues = Column(Text, default="[]")
     overall_status = Column(String(32), nullable=False)
     summary = Column(Text, nullable=False)
     rule_results = Column(Text, default="[]")      # JSON encoded

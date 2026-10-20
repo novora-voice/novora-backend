@@ -1,5 +1,4 @@
 import json
-from base64 import b64decode
 
 from novora.core.enums import OverallStatus, TestRunStatus
 from novora.core.execution_models import AgentConfig, ScriptedTurn, TestCase, TestRun
@@ -85,7 +84,34 @@ def test_elevenlabs_fails_if_response_never_completes(monkeypatch):
         raise AssertionError("The WebSocket must continue reading until response completion.")
 
 
-def test_assemblyai_streams_tts_and_waits_for_agent_turn(monkeypatch):
+def test_elevenlabs_surfaces_guardrail_and_session_errors(monkeypatch):
+    monkeypatch.setattr(
+        elevenlabs_client,
+        "request_json",
+        lambda *args, **kwargs: {"signed_url": "wss://example.invalid/session"},
+    )
+
+    for event, expected in [
+        ({"type": "guardrail_triggered"}, "guardrail was triggered"),
+        ({"type": "client_error", "client_error_event": {"message": "agent unavailable"}}, "agent unavailable"),
+    ]:
+        websocket = FakeWebSocket([
+            {"type": "conversation_initiation_metadata", "conversation_initiation_metadata_event": {}},
+            event,
+        ])
+        monkeypatch.setattr(elevenlabs_client, "connect", lambda *args, **kwargs: websocket)
+        try:
+            elevenlabs_client.ElevenLabsGhostCaller(api_key="test-key").run_conversation_session(
+                agent_id="agent_test",
+                scripted_turns=[ScriptedTurn(sequence=1, user_message="Hello.")],
+            )
+        except RuntimeError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError("Provider error events must end the evaluation with a clear reason.")
+
+
+def test_assemblyai_sends_text_and_waits_for_agent_turn(monkeypatch):
     websocket = FakeWebSocket(
         [
             {"type": "session.ready"},
@@ -102,22 +128,12 @@ def test_assemblyai_streams_tts_and_waits_for_agent_turn(monkeypatch):
         "request_json",
         lambda *args, **kwargs: {"token": "test-token"},
     )
-    monkeypatch.setattr(
-        assemblyai_client,
-        "request_bytes",
-        lambda *args, **kwargs: b"\x01\x00" * 1_200,
-    )
-    monkeypatch.setattr(assemblyai_client.time, "sleep", lambda _: None)
-
     def record_connect(url, **kwargs):
         request_args.append((url, kwargs))
         return websocket
 
     monkeypatch.setattr(assemblyai_client, "connect", record_connect)
-    client = assemblyai_client.AssemblyAIVoiceAgentClient(
-        api_key="assembly-test-key",
-        tts_api_key="eleven-test-key",
-    )
+    client = assemblyai_client.AssemblyAIVoiceAgentClient(api_key="assembly-test-key")
     result = client.run_agent_session(
         agent_id="stored-assembly-agent",
         scripted_turns=[ScriptedTurn(sequence=1, user_message="Where is my order?")],
@@ -128,9 +144,9 @@ def test_assemblyai_streams_tts_and_waits_for_agent_turn(monkeypatch):
         "type": "session.update",
         "session": {"agent_id": "stored-assembly-agent"},
     }
-    audio_messages = [message for message in sent if message["type"] == "input.audio"]
-    assert audio_messages
-    assert b"".join(b64decode(message["audio"]) for message in audio_messages).startswith(b"\x01\x00")
+    assert {"type": "conversation.message", "role": "user", "content": "Where is my order?"} in sent
+    assert {"type": "reply.create"} in sent
+    assert not any(message["type"] == "input.audio" for message in sent)
     assert sent[-1] == {"type": "session.end"}
     assert "token=test-token" in request_args[0][0]
     assert any(event.event_type == "reply.done" for event in result["events"])
@@ -145,8 +161,6 @@ def test_assemblyai_adapter_uses_the_selected_agent_id(monkeypatch):
     captured = {}
 
     class FakeClient:
-        DEFAULT_TTS_VOICE_ID = "default-voice"
-
         def __init__(self, **kwargs):
             captured["config"] = kwargs
 
@@ -172,12 +186,12 @@ def test_assemblyai_adapter_uses_the_selected_agent_id(monkeypatch):
     run = AssemblyAIExecutionAdapter().execute_test_conversation(
         test_case,
         agent,
-        {"api_key": "assembly-key", "elevenlabs_tts_api_key": "tts-key"},
+        {"api_key": "assembly-key"},
     )
 
     assert run.status == TestRunStatus.COMPLETED
     assert captured["config"]["api_key"] == "assembly-key"
-    assert captured["config"]["tts_api_key"] == "tts-key"
+    assert set(captured["config"]) == {"api_key"}
     assert captured["session"]["agent_id"] == "stored-agent-id"
 
 
@@ -191,7 +205,7 @@ def test_assemblyai_execution_resolves_credentials_on_backend(monkeypatch):
             return None
 
     class FakePipeline:
-        def run_pipeline(self, scenario, test_case, agent, provider_config, enable_llm_judge=True):
+        def run_pipeline(self, scenario, test_case, agent, provider_config, enable_llm_judge=True, llm_rubrics=None):
             self.provider_config = provider_config
             conversation = Conversation(scenario_id=scenario.id)
             report = EvaluationReport(
@@ -211,8 +225,8 @@ def test_assemblyai_execution_resolves_credentials_on_backend(monkeypatch):
             return run, report, conversation
 
     monkeypatch.setenv("ASSEMBLYAI_API_KEY", "server-assembly-key")
-    monkeypatch.setenv("ELEVENLABS_API_KEY", "server-tts-key")
-    monkeypatch.setenv("ELEVENLABS_TTS_VOICE_ID", "server-voice-id")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "unused-elevenlabs-key")
+    monkeypatch.setenv("ELEVENLABS_TTS_VOICE_ID", "unused-voice-id")
     pipeline = FakePipeline()
     monkeypatch.setattr(test_runs, "pipeline", pipeline)
 
@@ -242,5 +256,5 @@ def test_assemblyai_execution_resolves_credentials_on_backend(monkeypatch):
     )
 
     assert pipeline.provider_config["api_key"] == "server-assembly-key"
-    assert pipeline.provider_config["elevenlabs_tts_api_key"] == "server-tts-key"
-    assert pipeline.provider_config["elevenlabs_tts_voice_id"] == "server-voice-id"
+    assert "elevenlabs_tts_api_key" not in pipeline.provider_config
+    assert "elevenlabs_tts_voice_id" not in pipeline.provider_config
