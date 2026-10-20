@@ -1,156 +1,123 @@
-# Novora — AI Voice-Agent Evaluation & Observability Platform
+# Novora backend
 
-Novora is a modular AI voice-agent infrastructure platform that tests and verifies whether AI voice agents accomplish real business outcomes, follow company policy, and resolve customer issues with traceable evidence.
+The backend is a Python modular monolith built with FastAPI. It exposes the API used by the dashboard, normalizes provider conversations, evaluates scenarios, and persists reports with evidence.
 
-Built with Python and FastAPI using a clean modular monolith architecture.
+## Architecture
 
----
-
-## 1. Modular Architecture
-
-```
-novora/
-├── core/                  # Domain models, enums, protocols
-│   ├── enums.py           # MessageRole, RuleStatus, OverallStatus, RuleType, ConversationSource
-│   ├── models.py          # EvaluationScenario, Conversation, RuleResult, EvaluationReport, RegressionReport
-│   └── interfaces.py      # Abstract protocols for evaluators, repositories, telephony, webhooks
-├── evaluation/            # Deterministic rule engine & regression diff comparator
-│   ├── engine.py          # EvaluationEngine orchestrator
-│   ├── comparator.py      # EvaluationComparator for baseline vs candidate diffs
-│   └── rules/             # 6 deterministic rule engines
-│       ├── required_info.py           # Rule 1: Required Information
-│       ├── required_steps.py          # Rule 2: Sequential Workflow Steps
-│       ├── prohibited_claims.py       # Rule 3: Prohibited Claims & Promises
-│       ├── unsupported_completion.py  # Rule 4: Flag claims without backend verification
-│       ├── unresolved_work.py         # Rule 5: Unresolved Work Detection
-│       └── policy_compliance.py       # Rule 6: Quantitative Policy Limits
-├── providers/             # Capability protocols for third-party systems
-│   └── base.py            # VoiceAgentProvider, TelephonyProvider, TranscriptionProvider protocols
-├── adapters/              # Persistence repositories and provider normalizers
-│   ├── database.py        # SQLAlchemy models and SQLite/PostgreSQL repositories
-│   ├── repositories.py    # Thread-safe in-memory stores for dev/test
-│   └── providers/         # Provider payload adapters
-│       ├── transcript_importer.py     # Parses raw text or JSON dialogue transcripts
-│       ├── elevenlabs.py              # ElevenLabs webhook HMAC-SHA256 & idempotency
-│       ├── twilio.py                  # Twilio call/recording status & X-Twilio-Signature
-│       └── assemblyai.py              # AssemblyAI diarization & utterance mapping
-└── api/                   # REST API Layer
-    ├── main.py            # FastAPI Application & dependency injection
-    └── schemas.py         # Pydantic request & response schemas
+```mermaid
+flowchart TB
+    Client[Frontend or provider webhook] --> Routes[FastAPI routes]
+    Routes --> Auth[Signup, login, bearer authentication]
+    Routes --> Domain[Scenario, execution, evaluation services]
+    Domain --> Repos[SQLAlchemy repositories]
+    Repos --> DB[(PostgreSQL)]
+    Routes -->|enqueue durable job| Redis[(Redis)]
+    Redis --> Worker[Embedded ARQ worker]
+    Worker --> Pipeline[Combined evaluation pipeline]
+    Pipeline --> Payload[Payload generation and validation]
+    Payload --> Ghost[Ghost caller]
+    Ghost --> Adapters[Provider adapters]
+    Adapters --> External[ElevenLabs, Vapi, Retell, AssemblyAI]
+    Ghost --> Transcript[Normalized conversation]
+    Transcript --> Rules[Deterministic rules]
+    Rules --> Judge[Optional LLM judge]
+    Judge --> Report[Report with evidence and integrity metadata]
+    Report --> DB
 ```
 
----
+### Request and worker runtime
 
-## 2. Running Automated Tests
+- Synchronous API routes validate requests, persist records, and return responses.
+- Provider evaluation jobs are queued through ARQ and Redis. The API starts the ARQ worker as a background task in the same process.
+- The worker runs the ghost caller and combined pipeline: construct or validate the test input, execute the provider session, normalize its events, apply evaluation rules, optionally run an LLM judge, and save the result.
+- The dashboard polls job state through the API. PostgreSQL stores the job status and result; Redis transports the work.
+- The worker retries failed jobs up to ten times after the initial attempt. A retry can repeat an external provider action if the process failed before saving completion, so prefer sandbox agents for retry testing.
 
-Run the full pytest suite (unit, API, integration, and regression tests):
+This single-process deployment is easier to operate initially. API request load and background evaluation capacity scale together. Running multiple API instances also starts multiple workers on the shared queue, so capacity and provider rate limits should be considered when scaling.
 
-```bash
+## Persistence and database
+
+PostgreSQL is the durable source of truth for authentication users, scenarios, conversations, evaluation reports, integrations, agents, test cases, test runs, batches, telephony records, webhook events, and evaluation jobs.
+
+Some records use relational columns; flexible application records are stored as serialized JSON payloads through a generic SQLAlchemy record repository. This reduces schema work while models are changing, at the cost of less convenient SQL querying and database-level constraints for those payload fields.
+
+At startup, the service creates missing tables with SQLAlchemy and performs limited additive updates to evaluation-report columns. There is no full migration framework in the current service. Review data compatibility before changing models, and use a deliberate migration plan for production schema evolution.
+
+Provider API keys are encrypted before being stored. Set a stable NOVORA_SECRET_ENCRYPTION_KEY; changing it makes stored credentials unreadable. NOVORA_JWT_SECRET must also be configured and is used to sign bearer tokens.
+
+SQLite is useful for automated tests and local isolated checks. A deployed service should use managed PostgreSQL so data survives container replacement. When the scenario table is empty, startup inserts the built-in starter scenarios; it does not create sample agent or evaluation records.
+
+## Queue and background work
+
+Redis is a job transport, not the persistent database. EvaluationJobState records are saved in PostgreSQL, including status, attempts, failures, and completed output. If a worker restarts, unfinished jobs can be picked up again.
+
+For local development, REDIS_URL can point to a local Redis service. If the default local Redis is unavailable, the backend attempts to start or reuse a Docker container named novora-redis; this local convenience does not apply to Render. In deployment, configure REDIS_URL with the internal connection URL of a managed Redis-compatible service.
+
+ARQ gives at-least-once execution, not exactly-once external effects. A provider call may have started even if the worker did not persist the result before interruption.
+
+## Knowledge base status
+
+Knowledge retrieval is not part of the active API flow. Vector and graph connector protocols and prototype classes are present, but their current storage is in-memory test data; there is no production ingestion, indexing, retrieval API, or connection from retrieved documents to evaluation verdicts. The frontend labels Knowledge Base connectors as planned Phase Two work. Do not configure these prototypes as production integrations.
+
+Phase Two is expected to add approved read-only sources, retrieval grounded in those sources, source/version traceability on reports, and scoped authorization and network protections. Until then, evaluation results are based on the conversation, scenario rules, trusted action records, provider data, and any optional LLM judge—not on customer knowledge-base documents.
+
+## API capabilities
+
+The API currently includes:
+
+- Authentication and current-user endpoints.
+- Scenario creation, listing, retrieval, templates, and run history.
+- Transcript import and conversation retrieval.
+- Synchronous evaluation, evaluation history, and baseline/candidate comparison.
+- Provider manifests and provider integrations.
+- Agent configuration and connectivity checks.
+- Test cases, scripted test runs, batches, and durable evaluation jobs.
+- HTTP tool endpoint configuration and deterministic connectivity/evaluation.
+- ElevenLabs, Twilio, AssemblyAI, Vapi, and Retell webhook ingestion.
+- Health reporting at /health.
+
+OpenAPI documentation is served at /docs while the API is running.
+
+## Local setup
+
+Requirements: Python 3.10 or newer, PostgreSQL, and Redis. For the dashboard, install the frontend separately.
+
+1. Create a PostgreSQL database and a Redis instance.
+2. Set these variables in your local environment or secret manager:
+   - NOVORA_DATABASE_URL
+   - REDIS_URL
+   - NOVORA_JWT_SECRET
+   - NOVORA_SECRET_ENCRYPTION_KEY
+3. Install backend dependencies and start the API:
+
+```sh
 cd backend
-python -m pytest -v
-```
-
-
----
-
-## 3. Running the REST API
-
-Configure PostgreSQL in `backend/.env` before starting the API:
-
-```dotenv
-NOVORA_DATABASE_URL=postgresql+psycopg://novora:<password>@localhost:5432/novora
-NOVORA_JWT_SECRET=<long-random-secret>
-NOVORA_SECRET_ENCRYPTION_KEY=<long-random-secret>
-```
-
-Create the `novora` database and database user before startup. The API creates
-missing tables during initialization; PostgreSQL is the durable source of truth
-for users, scenarios, conversations, evaluation reports, provider integrations and agent
-configurations, test cases, test runs, batches, telephony calls, webhook events,
-and evaluation job state.
-Provider API keys are encrypted before being written to PostgreSQL. Keep
-`NOVORA_SECRET_ENCRYPTION_KEY` stable and backed up; changing it makes existing
-integration credentials unreadable. Do not use the development fallback secrets
-in a deployed environment.
-
-Launch the local development server:
-
-```bash
-cd backend
+python -m pip install -r requirements.txt
 python -m uvicorn novora.api.main:app --app-dir . --reload --port 8000
 ```
 
-Interactive OpenAPI documentation is available at `http://127.0.0.1:8000/docs`.
+The API listens locally on http://127.0.0.1:8000. NOVORA_DATABASE_URL must include a SQLAlchemy-compatible PostgreSQL URL, for example a postgresql+psycopg URL. Do not place real secrets in tracked files.
 
-### Deploy with Docker on Render
+### Run tests
 
-Create a Render Web Service from this repository, select the Docker runtime,
-and use `Dockerfile` at the repository root. The container listens on Render's
-`PORT` (default `10000`) on `0.0.0.0`.
+```sh
+cd backend
+python -m pytest -q
+```
 
-Configure these environment variables in Render before the first deploy:
+The test configuration uses an isolated SQLite database and disables the background worker.
 
-- `NOVORA_DATABASE_URL`: the internal connection URL for a Render PostgreSQL database.
-- `REDIS_URL`: the internal connection URL for a Render Key Value instance.
-- `NOVORA_JWT_SECRET`: a long, random secret used to sign login tokens.
-- `NOVORA_SECRET_ENCRYPTION_KEY`: a long, random, stable secret used to encrypt provider credentials.
+## Render Docker deployment
 
-Keep the encryption key stable across deploys; changing it makes stored
-provider credentials unreadable. The web service needs network access to both
-PostgreSQL and Key Value.
+Create a Render Web Service for this repository, choose Docker, and use the root Dockerfile. The image binds to 0.0.0.0 on Render's PORT, which defaults to 10000.
 
-### API Endpoints
+Provision PostgreSQL and Redis-compatible Key Value separately, then set:
 
-- `POST /api/v1/scenarios` — Register a business evaluation scenario with rules.
-- `GET /api/v1/scenarios/{scenario_id}` — Retrieve a scenario.
-- `GET /api/v1/scenarios` — List registered scenarios.
-- `POST /api/v1/evaluations` — Evaluate a conversation against a scenario and persist the report.
-- `GET /api/v1/evaluations/{evaluation_id}` — Retrieve an evaluation report with message-level evidence.
-- `GET /api/v1/evaluations?scenario_id=...` — Filter reports for a given scenario.
-- `GET /api/v1/scenarios/{scenario_id}/history` — Evaluation history for repeated scenario runs.
-- `POST /api/v1/evaluations/compare` — Compare baseline vs candidate runs to detect regressions.
-- `POST /api/v1/test-runs/jobs` — Enqueue a durable provider evaluation.
-- `GET /api/v1/test-runs/jobs/{job_id}` — Check queued evaluation status and retrieve its final report.
-- `POST /api/v1/conversations/import-transcript` — Import dialogue text or JSON records.
-- `POST /api/v1/webhooks/elevenlabs` — Ingest ElevenLabs webhook with HMAC validation and deduplication.
-- `POST /api/v1/webhooks/twilio` — Ingest Twilio telephony call status & recording callbacks.
-- `POST /api/v1/webhooks/assemblyai` — Ingest completed transcription results.
-- `GET /api/v1/telephony/calls` — Query isolated telephony call records.
-- `GET /health` — Health check endpoint.
+| Variable | Purpose |
+| --- | --- |
+| NOVORA_DATABASE_URL | PostgreSQL connection URL |
+| REDIS_URL | Redis-compatible queue connection URL |
+| NOVORA_JWT_SECRET | Random secret for signing access tokens |
+| NOVORA_SECRET_ENCRYPTION_KEY | Stable key used to encrypt provider credentials |
 
-### Durable provider evaluations
-
-The backend starts the embedded ARQ worker during startup. If `REDIS_URL` is
-unset, it uses `redis://127.0.0.1:6379/0`; when that local Redis instance is not
-reachable, the backend starts or reuses a `novora-redis` Docker container. Docker
-Desktop must be running for this local auto-start. Set `REDIS_URL` to use a
-managed Redis service in deployment. Backend startup fails clearly if the queue
-cannot be initialized, and `/health` reports `evaluation_queue: ready` when the
-worker is running.
-
-Redis is used to queue work; job requests, status, attempts, failures, and
-completed results are stored in PostgreSQL. Queued provider evaluations survive
-worker restarts; interrupted jobs are picked up again when the worker starts.
-The worker allows 10 retries after the initial attempt, waiting a random 5-10
-seconds between failed attempts, and limits each attempt to 10 minutes. The
-frontend polls PostgreSQL-backed job state and offers a manual retry after the
-automatic attempts are exhausted.
-ARQ provides at-least-once execution: an interrupted run can be repeated if a
-worker stops after the provider action has happened but before its result is
-saved. For live provider runs this may initiate another provider session, so
-the sandbox mode is recommended for automatic retries.
-
----
-
-## 4. Key Capabilities & Invariants
-
-1. **Deterministic Traceability**:
-   Every `RuleResult` contains `EvidenceReference` elements citing the exact `message_id`, `speaker`, character spans (`char_start`, `char_end`), and snippet.
-2. **Missing Evidence Invariance**:
-   Missing data never defaults to `PASS`. It yields `FAIL` or `INCONCLUSIVE`.
-3. **Unsupported Completion Protection**:
-   If an agent verbally claims an action was executed (e.g. *"I have processed your refund"*), Novora checks `conversation.trusted_action_records`. If no backend system confirms the action, the call is flagged with `UNSUPPORTED_COMPLETION` failure.
-4. **Idempotent Webhooks & Anti-Replay**:
-   Incoming webhooks are deduplicated using provider event IDs and verified against timestamp drift.
-5. **Telephony Data Isolation**:
-   Twilio call metadata (`CallSid`, `Duration`, `RecordingUrl`) is kept in separate telephony records and never conflated with evaluation dialogue.
+Keep the encryption key backed up and unchanged between deploys. Configure provider-specific credentials through the app or deployment's secret manager. Never commit .env, .env.example, credential dumps, or generated local database files.
