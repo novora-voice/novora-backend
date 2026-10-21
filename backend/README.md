@@ -2,6 +2,8 @@
 
 The backend is a Python modular monolith built with FastAPI. It exposes the API used by the dashboard, normalizes provider conversations, evaluates scenarios, and persists reports with evidence.
 
+Novora's purpose is to determine whether conversational voice agents meet business workflows and policy, with inspectable transcript evidence behind each result. The evaluation core is provider-neutral: provider-specific sessions and webhook payloads are adapted into a shared conversation model before rules run. See the [recruiter-facing project overview](../PROJECT_OVERVIEW.md) for the end-to-end product description, diagrams, technology summary, and Phase Two roadmap.
+
 ## Architecture
 
 ```mermaid
@@ -18,12 +20,15 @@ flowchart TB
     Payload --> Ghost[Ghost caller]
     Ghost --> Adapters[Provider adapters]
     Adapters --> External[ElevenLabs, Vapi, Retell, AssemblyAI]
+    Adapters --> Twilio[Twilio telephony callbacks]
     Ghost --> Transcript[Normalized conversation]
     Transcript --> Rules[Deterministic rules]
     Rules --> Judge[Optional LLM judge]
     Judge --> Report[Report with evidence and integrity metadata]
     Report --> DB
 ```
+
+The LLM judge is supplementary to deterministic checks. Reports preserve rule-level outcomes and evidence; a judge result cannot override a deterministic policy failure, and missing evidence is not treated as success.
 
 ### Request and worker runtime
 
@@ -75,6 +80,14 @@ The API currently includes:
 - HTTP tool endpoint configuration and deterministic connectivity/evaluation.
 - ElevenLabs, Twilio, AssemblyAI, Vapi, and Retell webhook ingestion.
 - Health reporting at /health.
+
+Provider support is capability-specific. ElevenLabs and AssemblyAI have provider session paths; Vapi and Retell include provider-shaped tool or webhook contract testing; Twilio provides telephony status and recording callbacks rather than agent dialogue evaluation. Signed webhook checks, bounded ingestion payloads, transcript-as-data handling, encrypted credentials, and outbound endpoint destination checks protect these integration boundaries. Consult [provider capabilities](docs/provider-capabilities.md) and the [security review](docs/security-review.md) for detail.
+
+The evaluation engine covers required information and steps, prohibited claims, policy compliance, unsupported completion claims, unresolved work, escalation and confirmation, turn constraints, and tool-call behavior. Persisted evaluation history can be compared between a baseline and candidate run to identify rule-level regressions.
+
+## Phase Two roadmap
+
+The Knowledge Base page is planned work. Phase Two is expected to add authorized read-only knowledge sources, retrieval-grounded evaluation, and source/version references in reports. The frontend also labels the following capabilities as planned: a managed Voxia voice runtime, stateful LangGraph workflows, and organization-level access controls/RBAC. These capabilities are not part of the current end-to-end product, and no release date is committed. In particular, the vector and graph connector prototypes are in-memory and are not production knowledge integrations.
 
 OpenAPI documentation is served at /docs while the API is running.
 
