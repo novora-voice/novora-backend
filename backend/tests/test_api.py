@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from novora.api.main import create_app
-from novora.core.enums import MessageRole, OverallStatus, RuleType
+from novora.core.enums import MessageRole, OverallStatus, RuleStatus, RuleType
+from novora.core.models import Conversation, ConversationMessage, EvaluationReport, RuleResult
 
 @pytest.fixture
 def client():
@@ -12,6 +15,90 @@ def test_health_check(client):
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
+
+
+def test_compare_reports_missing_candidate_transcript_as_inconclusive(client):
+    app = client.app
+    baseline = EvaluationReport(
+        id="eval_integrity_base",
+        scenario_id="scen_integrity",
+        conversation_id="conv_integrity_base",
+        scenario_fingerprint="scenario-v1",
+        expected_rule_ids=["rule_order"],
+        overall_status=OverallStatus.PASS,
+        summary="Pass",
+        rule_results=[RuleResult(
+            rule_id="rule_order",
+            rule_name="Order ID",
+            rule_type=RuleType.REQUIRED_INFORMATION,
+            status=RuleStatus.PASS,
+            explanation="Order ID was collected.",
+        )],
+    )
+    candidate = baseline.model_copy(update={
+        "id": "eval_integrity_candidate",
+        "conversation_id": "conv_missing_candidate",
+        "test_run_id": "trun_missing_candidate",
+        "overall_status": OverallStatus.FAIL,
+        "rule_results": [baseline.rule_results[0].model_copy(update={"status": RuleStatus.FAIL})],
+    })
+    app.state.evaluation_repository.save(baseline)
+    app.state.evaluation_repository.save(candidate)
+    app.state.conversation_repository.save(Conversation(
+        id=baseline.conversation_id,
+        scenario_id=baseline.scenario_id,
+        messages=[ConversationMessage(role=MessageRole.CUSTOMER, content="Order ORD-1001", sequence=0)],
+    ))
+
+    response = client.post("/api/v1/evaluations/compare", json={
+        "baseline_evaluation_id": baseline.id,
+        "candidate_evaluation_id": candidate.id,
+    })
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["comparison_status"] == "INCONCLUSIVE"
+    assert result["coverage_complete"] is False
+    assert result["regression_detected"] is False
+    assert any("Candidate transcript" in issue for issue in result["coverage_issues"])
+    assert any("Candidate test run" in issue for issue in result["coverage_issues"])
+
+
+def test_agent_evaluation_query_returns_latest_for_exact_agent_id(client):
+    app = client.app
+    older = EvaluationReport(
+        id="eval_agent_old",
+        scenario_id="scen_agent_old",
+        agent_id="provider-agent-1",
+        agent_name="Support Agent",
+        conversation_id="conv_old",
+        overall_status=OverallStatus.PASS,
+        summary="Older",
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    newest = older.model_copy(update={
+        "id": "eval_agent_new",
+        "scenario_id": "scen_agent_new",
+        "conversation_id": "conv_new",
+        "overall_status": OverallStatus.FAIL,
+        "summary": "Newest",
+        "created_at": datetime(2025, 2, 1, tzinfo=timezone.utc),
+    })
+    other_agent_same_name = older.model_copy(update={
+        "id": "eval_other_agent",
+        "agent_id": "provider-agent-2",
+        "scenario_id": "scen_other",
+        "conversation_id": "conv_other",
+        "overall_status": OverallStatus.PASS,
+        "created_at": datetime(2025, 3, 1, tzinfo=timezone.utc),
+    })
+    for report in (older, newest, other_agent_same_name):
+        app.state.evaluation_repository.save(report)
+
+    response = client.get("/api/v1/evaluations?agent_id=provider-agent-1&agent_name=Support%20Agent&limit=1")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == ["eval_agent_new"]
 
 def test_scenario_creation_and_retrieval(client):
     payload = {
@@ -95,6 +182,9 @@ def test_evaluate_conversation_api_flow(client):
     get_report = client.get(f"/api/v1/evaluations/{eval_id}")
     assert get_report.status_code == 200
     assert get_report.json()["id"] == eval_id
+    get_conversation = client.get("/api/v1/conversations/conv_test_1")
+    assert get_conversation.status_code == 200
+    assert get_conversation.json()["id"] == "conv_test_1"
 
     # 4. List reports by scenario
     list_reports = client.get(f"/api/v1/evaluations?scenario_id={scenario_id}")

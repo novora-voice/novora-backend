@@ -4,6 +4,10 @@ This document specifies the HTTP endpoints exposed by the Novora Backend API for
 
 All requests accept and return `application/json` unless otherwise specified.
 
+Runtime API data is persisted in PostgreSQL configured by `NOVORA_DATABASE_URL`.
+Redis is only the provider-job queue; job records and completed reports remain in
+PostgreSQL and are available after a backend restart.
+
 ---
 
 ## 1. Scenarios
@@ -82,7 +86,7 @@ Evaluate a normalized conversation against a scenario and persist the report.
 ```
 
 **Response (201 Created):**
-`EvaluationReport` object containing `overall_status`, `summary`, `rule_results`, and message citations.
+`EvaluationReport` object containing `overall_status`, `summary`, `rule_results`, and message citations. Provider-run reports also include the configured `agent_id` and `agent_name`; both values are persisted in report history.
 
 ### `GET /api/v1/evaluations/{evaluation_id}`
 Retrieve a persisted evaluation report.
@@ -192,6 +196,12 @@ Retrieve built-in scenario templates:
 ### `POST /api/v1/test-runs`
 Execute a programmatic ghost-caller test conversation against a configured provider agent, capture observable events and tool calls, and run deterministic + LLM evaluations.
 
+### `POST /api/v1/test-runs/jobs`
+Queue a provider evaluation for ARQ execution. The accepted response includes a `job_id` and initial `queued` status. Evaluation attempts are retried up to 10 times after the initial attempt with a 5–10 second delay.
+
+### `GET /api/v1/test-runs/jobs/{job_id}`
+Retrieve the queued evaluation status, retry count, final test run, and evaluation report when complete.
+
 ### `GET /api/v1/test-runs/{test_run_id}`
 Retrieve execution status, normalized conversation events, tool calls, and final evaluation report.
 
@@ -201,3 +211,31 @@ Trigger a batch evaluation across multiple test cases and scenarios.
 ### `GET /api/v1/batches/{batch_id}`
 Inspect overall batch progress, pass/fail counts, and partial failures.
 
+## 6. Developer HTTP Tool Endpoints
+
+Authenticated developers can add their application-owned HTTP endpoint as the
+bridge to a database or CRM. Novora sends a provider-shaped custom-tool request
+to that server and captures the actual HTTP status, round-trip latency, and
+response body. Novora does not receive direct database credentials or connect
+to the developer's database itself.
+
+- `POST /api/v1/tool-endpoints` — Save an endpoint configuration and optional
+  bearer token. Tokens are encrypted at rest and never returned.
+- `GET /api/v1/tool-endpoints` — List the signed-in developer's endpoints.
+- `PUT /api/v1/tool-endpoints/{endpoint_id}` — Update an endpoint; an omitted
+  token retains the currently stored token.
+- `DELETE /api/v1/tool-endpoints/{endpoint_id}` — Remove an endpoint.
+- `POST /api/v1/tool-endpoints/{endpoint_id}/evaluations` — Replay a
+  deterministic function call using supplied JSON arguments and persist the
+  endpoint's response.
+- `GET /api/v1/tool-endpoints/{endpoint_id}/evaluations` — List saved endpoint
+  evaluations for that endpoint.
+
+Vapi endpoints use its `tool-calls` HTTP POST envelope and the response must
+include a matching `toolCallId` in `results`. Retell endpoints use its
+custom-function HTTP request shape (`name`, `call`, and `args`), with GET and
+DELETE arguments sent as query parameters. All non-GET methods are blocked
+unless `allow_writes` is explicitly true for that evaluation. Endpoint URLs
+must use HTTPS and resolve to public IP addresses by default. Local development
+against private endpoints requires setting
+`NOVORA_ALLOW_PRIVATE_TOOL_ENDPOINTS=true` on the backend.

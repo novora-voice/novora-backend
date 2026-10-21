@@ -49,6 +49,15 @@ def test_payload_generator_and_agent_id_validation():
     assert "nova-2" in vapi_payload["transcriber"]["model"]
     assert "Ensure customer account is verified" in vapi_payload["model"]["messages"][0]["content"]
 
+    # A saved Vapi template may contain a placeholder or stale assistant ID.
+    custom_vapi_req = PayloadGenerationRequest(
+        provider="vapi",
+        agent_id="dede77e3-e7f7-40e2-84dc-c0735cc10f74",
+        custom_json={"assistantId": "asst_vapi_support_01", "name": "Support"},
+    )
+    custom_vapi_payload = generator.generate(custom_vapi_req)
+    assert custom_vapi_payload["assistantId"] == "dede77e3-e7f7-40e2-84dc-c0735cc10f74"
+
     # Retell payload generation
     retell_req = PayloadGenerationRequest(
         provider="retell",

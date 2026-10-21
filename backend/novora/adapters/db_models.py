@@ -26,7 +26,13 @@ class DBEvaluationReport(Base):
 
     id = Column(String(64), primary_key=True)
     scenario_id = Column(String(64), nullable=False, index=True)
+    agent_id = Column(String(255), nullable=True)
+    agent_name = Column(String(255), nullable=True)
     conversation_id = Column(String(64), nullable=False, index=True)
+    test_run_id = Column(String(64), nullable=True, index=True)
+    scenario_fingerprint = Column(String(64), nullable=True)
+    expected_rule_ids = Column(Text, default="[]")
+    integrity_issues = Column(Text, default="[]")
     overall_status = Column(String(32), nullable=False)
     summary = Column(Text, nullable=False)
     rule_results = Column(Text, default="[]")      # JSON encoded
@@ -61,3 +67,21 @@ class DBWebhookEvent(Base):
     payload = Column(Text, default="{}")           # JSON encoded
     status = Column(String(32), default="processed")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class DBConversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(String(64), primary_key=True)
+    scenario_id = Column(String(64), nullable=True, index=True)
+    payload = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class DBApplicationRecord(Base):
+    __tablename__ = "application_records"
+
+    id = Column(String(128), primary_key=True)
+    record_type = Column(String(64), primary_key=True)
+    scenario_id = Column(String(64), nullable=True, index=True)
+    provider_name = Column(String(64), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    payload = Column(Text, nullable=False)

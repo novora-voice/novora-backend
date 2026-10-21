@@ -122,6 +122,27 @@ class InMemoryEvaluationRepository(EvaluationRepository):
             matching = [r for r in self._store.values() if r.scenario_id == scenario_id]
         return matching[offset : offset + limit]
 
+    def list_by_agent(
+        self,
+        agent_id: Optional[str],
+        agent_name: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[EvaluationReport]:
+        with self._lock:
+            matching = [
+                report
+                for report in self._store.values()
+                if (agent_id and report.agent_id == agent_id)
+                or (
+                    agent_name
+                    and report.agent_name == agent_name
+                    and (not agent_id or not report.agent_id)
+                )
+            ]
+        matching.sort(key=lambda report: report.created_at, reverse=True)
+        return matching[offset : offset + limit]
+
 class InMemoryConversationRepository:
     """Thread-safe in-memory conversation store for ingested conversations."""
 

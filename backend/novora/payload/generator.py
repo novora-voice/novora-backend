@@ -30,7 +30,7 @@ class PayloadGenerator:
         if request.custom_json and not feedback:
             payload = dict(request.custom_json)
             # Ensure provider agent ID is correctly set
-            if request.provider == "vapi" and "assistantId" not in payload:
+            if request.provider == "vapi":
                 payload["assistantId"] = request.agent_id
             elif request.provider == "retell" and "agent_id" not in payload:
                 payload["agent_id"] = request.agent_id

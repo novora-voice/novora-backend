@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 from novora.core.enums import OverallStatus, TestRunStatus
 from novora.core.execution_models import (
@@ -10,15 +10,9 @@ from novora.core.execution_models import (
 )
 from novora.core.models import EvaluationScenario
 from novora.evaluation.orchestration.pipeline import CombinedEvaluationPipeline
-from novora.persistence.repositories import (
-    InMemoryBatchRepository,
-    InMemoryTestRunRepository,
-)
 from novora.scenarios.templates import get_default_test_case_for_scenario
 
 router = APIRouter(prefix="/api/v1/batches", tags=["Batch Evaluations"])
-default_batch_repo = InMemoryBatchRepository()
-default_test_run_repo = InMemoryTestRunRepository()
 pipeline = CombinedEvaluationPipeline()
 
 class BatchCreateRequest(BaseModel):
@@ -33,8 +27,18 @@ class BatchDetailResponse(BaseModel):
     test_run_statuses: List[Dict[str, Any]]
 
 @router.post("", response_model=BatchEvaluation, status_code=status.HTTP_201_CREATED)
-def create_and_run_batch(req: BatchCreateRequest) -> BatchEvaluation:
+def create_and_run_batch(req: BatchCreateRequest, request: Request) -> BatchEvaluation:
     """Execute a batch evaluation across multiple test cases."""
+    scenario_repository = request.app.state.scenario_repository
+    test_case_repository = request.app.state.test_case_repository
+    test_run_repository = request.app.state.test_run_repository
+    evaluation_repository = request.app.state.evaluation_repository
+    conversation_repository = request.app.state.conversation_repository
+    agent_repository = request.app.state.agent_repository
+    batch_repository = request.app.state.batch_repository
+
+    scenario_repository.save(req.scenario)
+    agent_repository.save(req.agent)
     tcs = req.test_cases or [get_default_test_case_for_scenario(req.scenario.id)]
     run_ids: List[str] = []
     passed = 0
@@ -42,13 +46,16 @@ def create_and_run_batch(req: BatchCreateRequest) -> BatchEvaluation:
     inconclusive = 0
 
     for tc in tcs:
+        test_case_repository.save(tc)
         run, report, conv = pipeline.run_pipeline(
             scenario=req.scenario,
             test_case=tc,
             agent=req.agent,
             provider_config=req.provider_config,
         )
-        default_test_run_repo.save(run)
+        conversation_repository.save(conv)
+        evaluation_repository.save(report)
+        test_run_repository.save(run)
         run_ids.append(run.id)
 
         if report.overall_status == OverallStatus.PASS:
@@ -73,12 +80,12 @@ def create_and_run_batch(req: BatchCreateRequest) -> BatchEvaluation:
         inconclusive_runs=inconclusive,
         status=overall_batch_status,
     )
-    return default_batch_repo.save(batch)
+    return batch_repository.save(batch)
 
 @router.get("/{batch_id}", response_model=BatchDetailResponse)
-def get_batch(batch_id: str) -> BatchDetailResponse:
+def get_batch(batch_id: str, request: Request) -> BatchDetailResponse:
     """Inspect progress, status, and partial failures of a batch evaluation."""
-    batch = default_batch_repo.get(batch_id)
+    batch = request.app.state.batch_repository.get(batch_id)
     if not batch:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -86,7 +93,7 @@ def get_batch(batch_id: str) -> BatchDetailResponse:
         )
     run_statuses = []
     for rid in batch.test_run_ids:
-        r = default_test_run_repo.get(rid)
+        r = request.app.state.test_run_repository.get(rid)
         if r:
             run_statuses.append({
                 "test_run_id": r.id,
@@ -98,6 +105,6 @@ def get_batch(batch_id: str) -> BatchDetailResponse:
     return BatchDetailResponse(batch=batch, test_run_statuses=run_statuses)
 
 @router.get("", response_model=List[BatchEvaluation])
-def list_batches() -> List[BatchEvaluation]:
+def list_batches(request: Request) -> List[BatchEvaluation]:
     """List all persisted batch evaluations."""
-    return default_batch_repo.list_all()
+    return request.app.state.batch_repository.list_all()

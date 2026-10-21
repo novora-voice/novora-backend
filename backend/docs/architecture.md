@@ -76,6 +76,7 @@ Novora follows a **modular monolith** design pattern with strict package separat
    - Every check must cite the exact message IDs, speaker, and snippet spans.
    - Missing evidence can **never** result in a `PASS` status.
    - External claims (e.g. "I have refunded $50") without trusted backend confirmation are flagged as `UNSUPPORTED_CLAIM`.
-4. **Clean Persistence Abstraction**:
-   - Repositories are defined as abstract protocols (`ScenarioRepository`, `EvaluationRepository`).
-   - Development and testing run against an in-memory repository; production connects to PostgreSQL via identical contracts.
+4. **PostgreSQL Source of Truth**:
+   - Runtime repositories persist scenarios, evaluations, conversations, execution records, integrations, batches, webhooks, and telephony records in PostgreSQL.
+   - Redis transports queued jobs only; their requests, state, and results are persisted in PostgreSQL.
+   - In-memory repositories remain available for isolated tests.

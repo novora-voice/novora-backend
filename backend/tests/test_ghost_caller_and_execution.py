@@ -34,7 +34,7 @@ def test_vapi_pstn_safety_guard():
     with pytest.raises(VapiSecurityError, match="Outbound phone calling is strictly disabled"):
         client.run_staging_test("asst_vapi_1", turns, destination_phone="+15551234567")
 
-def test_assemblyai_voice_agent_audio_mode():
+def test_assemblyai_voice_agent_accepts_scripted_text():
     client = AssemblyAIVoiceAgentClient(system_prompt="Support agent")
     turns = [
         ScriptedTurn(
@@ -43,7 +43,7 @@ def test_assemblyai_voice_agent_audio_mode():
             expected_tools=[],
         )
     ]
-    res = client.run_agent_session(turns, use_audio_input_mode=True)
+    res = client.run_agent_session(turns)
     assert any(e.event_type == "transcript.user" for e in res["events"])
     assert any(e.event_type == "reply.started" for e in res["events"])
     assert any(e.event_type == "reply.done" for e in res["events"])

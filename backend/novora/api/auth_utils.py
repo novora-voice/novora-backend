@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
+from sqlalchemy.pool import StaticPool
 import bcrypt
 
 try:
@@ -28,11 +29,12 @@ try:
 except ImportError as e:
     raise RuntimeError("python-jose[cryptography] is required.") from e
 
-DATABASE_URL: str = os.environ.get(
-    "NOVORA_DATABASE_URL",
-    "postgresql+psycopg://postgres:Chibueze2007@127.0.0.1:5432/novora",
-)
-SECRET_KEY: str = os.environ.get("NOVORA_JWT_SECRET", "novora-super-secret-key-CHANGE-IN-PRODUCTION")
+DATABASE_URL: str = os.environ.get("NOVORA_DATABASE_URL", "")
+SECRET_KEY: str = os.environ.get("NOVORA_JWT_SECRET", "")
+if not DATABASE_URL:
+    raise RuntimeError("NOVORA_DATABASE_URL must be configured before starting the API.")
+if not SECRET_KEY:
+    raise RuntimeError("NOVORA_JWT_SECRET must be configured before starting the API.")
 ALGORITHM = "HS256"
 AUTH_TOKEN_EXPIRE_HOURS = 12
 
@@ -54,7 +56,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             pass
     return False
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+if DATABASE_URL.startswith("sqlite"):
+    sqlite_options = {"connect_args": {"check_same_thread": False}}
+    if ":memory:" in DATABASE_URL or DATABASE_URL == "sqlite://":
+        sqlite_options["poolclass"] = StaticPool
+    engine = create_engine(DATABASE_URL, **sqlite_options)
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class Base(DeclarativeBase):

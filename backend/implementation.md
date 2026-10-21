@@ -1,74 +1,101 @@
-Novora is becoming a provider-aware voice-agent testing and evaluation platform, where customers configure what they want to test and Novora runs the agent, captures its actual behavior, and evaluates the results.
-The important distinction is that Novora should not merely evaluate transcripts uploaded after a call. Where a provider supports programmatic test conversations, Novora should act as a ghost caller: send scripted text to a staging agent, capture its responses and tool calls, and determine whether it behaved as expected.
-The provider determines the execution method and available evidence. Novora owns the evaluation framework.
-The product workflow
-1. Choose a provider
-ElevenLabs, AssemblyAI, Vapi, or Retell
+# NOVORA — COMPREHENSIVE BACKEND UPGRADE COMMAND
 
+## Principal AI Engineer | Provider Evaluation Engine | Ghost Caller | Automated Voice-Agent Testing Sandbox
 
-2. Choose or configure an agent scenario
-Customer support, incident response, language practice, or another supported scenario
+### 0. NON-NEGOTIABLE COMMANDS
 
+**Work exclusively in the `feat/provider-evaluation-engine` branch.**
 
-3. Configure evaluation criteria
-Deterministic checks, LLM-as-judge rubrics, expected tool calls, and scenario-specific rules
+**DO NOT CHANGE THE EXISTING FRONTEND DESIGN.**
 
+**ONLY ADD THE NEW FEATURES AND THE MINIMUM FUNCTIONAL WIRING REQUIRED TO SUPPORT THEM.**
 
-4. Execute the test
-Run a provider-supported test conversation and capture actual events, responses, and actions
+## MAKE USE OF HUGGING FACE INFERENCE CLIENT PROVIDERS
 
+The existing frontend design is approved and must remain unchanged.
 
-5. Evaluate and persist the report
-Combine deterministic results and LLM judgments, preserve evidence, and show failures and recommendations
+Do not redesign, restyle, replace, or unnecessarily refactor the frontend.
 
-Important provider distinction
-The implementation prompt should explicitly prevent Claude from assuming every provider supports the same testing protocol.
-- ElevenLabs: Its documented agent WebSocket supports text messages and emits conversation events. This is a strong candidate for the first ghost-caller integration. 
-  
-  ElevenLabs Documentation
-  +1
-- AssemblyAI: Its documented Voice Agent API uses wss://agents.assemblyai.com/v1/ws and describes audio input, transcripts, replies, and tool calls. The supplied example's text_input event should not be treated as supported without verification. 
-  
-  Documentation
-  +1
-- Vapi: Its API supports creating assistants and calls. The implementation must determine which call modes are appropriate for safe automated testing and how to retrieve the resulting events and artifacts. 
-- Retell AI too
+Do not change the existing:
 
-Branch A — feat/provider-evaluation-engine
-Backend, provider execution, deterministic checks, LLM judge, PostgreSQL, tests and APIs.
+- Colors, typography, spacing, and visual hierarchy.
+- Sidebar, navigation, or page structure.
+- Cards, tables, buttons, modals, or existing components' visual styling.
+- Layout, responsive behavior, or animations.
+- Dashboard appearance or existing design system.
 
-### THIS IS YOURMAIN PROMPT FOLLOW OTHER INSTRUCTIONS IN THE IMPLEMENTATION PLAN.
+New functionality must use existing components and styles. Add only the controls, fields, steps, modal content, provider labels, and status indicators required for the new features.
 
-# NOVORA — Principal Backend & AI Infrastructure Engineer
+The backend is the primary scope of this task.
 
-## Mission
+Before making changes, run:
 
-You are the Principal AI Engineer responsible for implementing Novora's provider-aware voice-agent testing and evaluation engine.
+```bash
+git status
+git branch --show-current
+```
 
-Novora is an AI voice-agent testing, monitoring, and evaluation platform. Users choose a supported provider, configure a testing scenario, define deterministic checks and LLM-as-judge rubrics, execute a test against a provider-supported agent interface, capture the agent's actual behavior, and receive an evidence-backed evaluation report.
+Confirm the current branch is `feat/provider-evaluation-engine`. If it is not, stop rather than switching branches unsafely or modifying another branch.
 
-This is not merely a transcript scoring application. Where the provider supports it, Novora should act as a programmatic ghost caller, send scripted user messages to a staging agent, capture the resulting conversation events and tool calls, and evaluate the actual observed behavior.
+Preserve uncommitted changes. Never reset, discard, or overwrite unrelated work. Do not merge into `main` or the frontend branch.
 
-The provider adapter owns provider-specific communication. The Novora evaluation engine owns the common evaluation semantics.
+**Do not rebuild Novora from scratch. Audit the repository first and extend the existing implementation.**
 
-## 1. Branch and repository discipline
+---
 
-Work only on:
+## 1. PRODUCT VISION
 
-`feat/provider-evaluation-engine`
+Novora is an automated pre-flight testing, evaluation, and regression-testing sandbox for AI voice agents.
 
-Before coding:
+The product should let a developer describe what they want to test in plain English, configure an agent and scenario, execute a supported test, inspect the agent's actual behavior, and determine whether the behavior meets their requirements.
 
-1. Inspect the existing repository and current branch.
-2. Read existing architecture, API contracts, database models, tests, and provider implementations.
-3. Preserve working code and existing authentication.
-4. Do not overwrite unrelated changes.
-5. Create an implementation plan.
-6. Establish the shared contracts before the frontend engineer implements dependent workflows.
+The developer should not need to manually place repeated phone calls just to discover whether a configuration, tool, prompt, or backend integration has broken.
 
-Do not merge into main or push directly to main.
+The central promise is:
 
-Publish and maintain these documents early:
+**Write what you want to test. Run the test. Observe the agent. Verify the outcome.**
+
+Novora should support two distinct testing paths.
+
+### Path A — Model and voice-agent testing
+
+For ElevenLabs and AssemblyAI, Novora acts as a ghost caller where the provider's documented interface supports automated conversation testing.
+
+Novora connects through the supported interface, supplies the test input, captures actual events and responses, and evaluates the interaction.
+
+### Path B — Pipeline and orchestration testing
+
+For Vapi and Retell, Novora tests supported agent execution, tool/webhook contracts, integrations, and business workflows.
+
+Where the provider offers a suitable agent execution or simulation interface, use it to test the actual configured agent.
+
+Where the user explicitly wants to test a webhook contract directly, generate a provider-specific test payload and submit it to the configured test endpoint.
+
+**Never confuse direct webhook testing with testing a complete live voice conversation.** Label the execution mode accurately and report what was actually tested.
+
+The two paths must reuse Novora's common scenario, evaluation, evidence, persistence, and reporting systems.
+
+---
+
+## 2. REPOSITORY AUDIT AND PRESERVATION
+
+Before writing code:
+
+1. Inspect the current branch, repository structure, README, dependencies, environment configuration, and Git status.
+2. Identify the current backend framework, API routes, database, migrations, queue system, and authentication model.
+3. Find existing ElevenLabs, AssemblyAI, Vapi, and Retell integrations.
+4. Trace the existing evaluation execution path from request to report.
+5. Inspect existing scenario storage, templates, evaluation criteria, provider configuration, WebSocket handling, and LLM integrations.
+6. Identify the source of the error:
+
+   `Scenario with id 'scen_refund_cap' not found. Cannot evaluate.`
+
+7. Determine whether the issue comes from a missing database record, hardcoded identifier, stale frontend reference, incorrect ownership scope, or broken scenario persistence.
+8. Preserve all working functionality and established conventions.
+9. Identify existing components that can be reused rather than introducing duplicate abstractions.
+10. Write a concise implementation plan before making major changes.
+
+Create or update the following documentation as needed:
 
 - `docs/architecture.md`
 - `docs/provider-capabilities.md`
@@ -76,504 +103,1062 @@ Publish and maintain these documents early:
 - `docs/api.md`
 - `docs/testing-strategy.md`
 
-Commit changes in small, focused units.
+Documentation must describe implemented behavior accurately. Never document a provider feature as working merely because an adapter class or UI entry exists.
 
-## 2. Core product model
+---
 
-Support the following initial scenario templates:
+## 3. PROVIDER CATEGORIES
 
-### Customer Support & Receptionist
+On the existing Agents page, separate the providers into two groups without redesigning the page.
 
-Evaluate whether the agent understands the request, asks for necessary information, follows policies, selects appropriate tools, handles customer issues, and escalates when necessary.
+### Voice Providers
 
-### Incident Response
+- ElevenLabs
+- AssemblyAI
 
-Evaluate whether the agent recognizes an incident, gathers required information, follows the configured incident policy, invokes appropriate approved tools, escalates at the correct point, and provides a clear status or next step.
+### Infrastructure Providers
 
-### Language Practitioner
+- Vapi
+- Retell
 
-Evaluate whether the agent practices the configured language, responds at the requested level, follows the selected learning approach, corrects mistakes appropriately, and stays within the requested exercise.
+Use the existing visual design to add the two group labels. Preserve the current provider cards and their behavior.
 
-These are reusable starting templates, not hardcoded limitations. Users must be able to customize criteria and create additional scenarios where the data model supports it.
+Expose provider metadata from the backend, including:
 
-Do not assume every provider has prebuilt agents.
+- Provider identifier.
+- Display name.
+- Category.
+- Configuration requirements.
+- Actual connection status.
+- Supported execution modes.
+- Supported input modes.
+- Supported event types.
+- Whether the relevant ghost-caller workflow is implemented and tested.
+- Whether direct webhook contract testing is supported.
+- Whether real calls or paid operations may occur.
 
-ElevenLabs users may select an existing configured agent. AssemblyAI users may configure the supported voice-agent session using a system prompt and tools. Vapi and Retell must have provider-specific agent/configuration identifiers and supported execution workflows.
+Do not assume the categories mean the providers have identical execution protocols. The categories organize the product; the adapters handle technical differences.
 
-## 3. Provider adapter architecture
+---
 
-Create a common provider interface with provider-specific implementations.
+## 4. SHARED ARCHITECTURE
 
-Potential structure, adapted to the existing repository:
+Implement or refine a provider-neutral testing engine using the repository's existing architecture.
 
-- `providers/base.py`
-- `providers/registry.py`
-- `providers/elevenlabs/`
-- `providers/assemblyai/`
-- `providers/vapi/`
-- `providers/retell/`
-- `execution/`
-- `normalization/`
-- `evaluation/deterministic/`
-- `evaluation/llm_judge/`
-- `evaluation/orchestration/`
-- `persistence/`
-- `api/`
+The execution pipeline should follow this pattern:
 
-Keep every source file below 200 lines. Split modules by responsibility.
+```text
+User configuration
+        ↓
+Scenario and test instructions
+        ↓
+Agent configuration validation
+        ↓
+Execution-mode selection
+        ↓
+Provider-specific adapter
+        ↓
+Actual provider events or HTTP response
+        ↓
+Normalized evidence
+        ↓
+Deterministic evaluation
+        ↓
+LLM-as-a-judge evaluation
+        ↓
+Result aggregation
+        ↓
+Persisted report and evaluation history
+```
 
-The shared provider interface should define the supported operations needed for a test run, such as:
+For Vapi and Retell payload generation, add the separate preparation pipeline described below before the relevant execution stage.
 
-- Validate configuration.
-- Check connectivity.
-- Discover or validate an agent/configuration where the API permits it.
-- Execute a supported test conversation.
-- Capture normalized events.
-- Report capabilities and unsupported operations.
-- Return a normalized execution result.
+### Shared responsibilities
 
-Do not require every provider to implement identical capabilities. Represent capability differences explicitly.
+Reuse the same core for:
 
-A provider adapter must not implement the evaluation policy itself.
+- Scenario and test-case management.
+- Test instructions and configuration validation.
+- Provider-neutral execution orchestration.
+- Event normalization.
+- Deterministic rules.
+- User-defined LLM evaluation rubrics.
+- LLM-as-a-judge orchestration.
+- Evidence references.
+- Evaluation aggregation.
+- Run history and reporting.
+- Batch execution and partial-failure handling.
+- Error classification and audit logging.
 
-## 4. Provider-specific implementation
+### Provider-specific responsibilities
 
-### ElevenLabs
+Keep these isolated in adapters:
 
-Implement a server-side adapter for configured ElevenLabs Conversational AI agents.
+- Authentication.
+- Agent identification and configuration.
+- Connection and session initialization.
+- Supported input delivery.
+- Audio encoding where required.
+- WebSocket event handling.
+- Tool-call and tool-result extraction.
+- Webhook request construction.
+- Provider-specific payload schemas.
+- Final artifact retrieval.
+- Provider-specific errors, limits, and retries.
 
-Use the official documentation to implement the supported WebSocket workflow and event handling.
+Reuse existing working adapters wherever possible. Do not copy the evaluation engine four times.
 
-Potentially relevant documented events include:
+---
 
-- `user_transcript`
-- `agent_response`
-- `client_tool_call`
-- `mcp_tool_call`
-- `client_tool_result`
-- Other supported conversation lifecycle events
+## 5. DEFINE A STRICT PROVIDER CONTRACT
 
-Use a provider-supported text message to simulate the caller where supported. Capture the actual response and tool-call events.
+Define a typed, documented contract that all provider adapters must implement where applicable.
 
-Handle authentication, session lifecycle, timeouts, malformed events, connection failures, and cleanup.
+The contract should cover:
 
-Do not assume that internal reasoning is available or required. Evaluate observable outputs, tool requests, tool results, and other permitted evidence. Do not persist private chain-of-thought.
+- Provider identity and declared capabilities.
+- Configuration validation.
+- Agent identification.
+- Supported execution modes.
+- Session creation and lifecycle.
+- Supported input submission.
+- Event collection.
+- Transcript retrieval.
+- Tool-call and tool-result observation.
+- Completion and error handling.
+- Final artifact retrieval.
+- Cancellation and timeouts where supported.
+- Explicit unsupported-capability reporting.
+
+Normalize actual provider events into a common internal model with fields such as:
+
+- `event_id`
+- `run_id`
+- `provider`
+- `event_type`
+- `sequence_number`
+- `occurred_at`
+- `speaker`
+- `text`
+- `tool_name`
+- `tool_arguments`
+- `tool_result`
+- `status`
+- `raw_payload_reference`
+
+Optional fields must remain optional. Do not invent missing information.
+
+Retain useful raw evidence securely, redact secrets, and distinguish actual observations from derived interpretations.
+
+Every provider adapter must pass the shared contract tests applicable to its declared capabilities.
+
+---
+
+## 6. STEP-BY-STEP EVALUATION WORKFLOW
+
+The user's workflow must be sequential, explicit, and enforced by the backend.
+
+The expected sequence is:
+
+1. Choose an evaluation type and provider.
+2. Configure the agent.
+3. Create a scenario or choose an existing scenario.
+4. Define what to test.
+5. Add deterministic rules.
+6. Add LLM evaluation criteria.
+7. Generate and validate any required provider payload.
+8. Execute the selected test mode.
+9. Evaluate the captured evidence.
+10. Review the results.
+
+The backend must validate prerequisites before advancing.
+
+If a required field is missing, return a structured validation error and preserve the user's existing configuration.
+
+The existing frontend should expose these steps using its current design. Do not redesign the entire workflow or introduce an unrelated UI framework.
+
+---
+
+## 7. AGENT CONFIGURATION
+
+The user controls their agent configuration.
+
+**An agent ID is mandatory before an evaluation can execute.**
+
+Depending on the provider and execution mode, the configuration may include:
+
+- Provider.
+- Agent ID.
+- Assistant ID, if distinct and required.
+- Credential reference.
+- Test endpoint URL for direct webhook tests.
+- Environment.
+- Provider-specific settings.
+- Optional test constraints.
+
+Do not require fields that are irrelevant to a particular provider or execution mode.
+
+Never expose provider secrets to the browser.
+
+Validate configuration on the backend before running the evaluation.
+
+If the agent ID is missing, return an error such as:
+
+```json
+{
+  "code": "AGENT_ID_REQUIRED",
+  "message": "An agent ID is required before running an evaluation."
+}
+```
+
+A configured agent ID must not automatically be treated as proof that the provider connection works. Validate the connection or execution configuration where the provider supports verification.
+
+---
+
+## 8. SCENARIO CREATION AND SELECTION
+
+Every evaluation must reference a valid, persisted scenario.
+
+Fix the existing failure:
+
+`Scenario with id 'scen_refund_cap' not found. Cannot evaluate.`
+
+Investigate the actual root cause. Remove any invalid hardcoded assumptions, stale identifiers, or fake scenario references.
+
+Do not silently create an evaluation scenario from a missing ID.
+
+Do not fabricate successful scenario retrieval.
+
+### If the user has no scenarios
+
+Return a clear, actionable state:
+
+`Create a scenario before running an evaluation, or choose an existing scenario if one is available.`
+
+Expose the appropriate create/select workflow through the existing frontend.
+
+### If the user already has scenarios
+
+Allow the user to choose a previously created scenario.
+
+The selection modal should communicate:
+
+**Choose an existing scenario to test, or create a new scenario first.**
+
+Validate scenario existence and ownership on the backend when the user submits the evaluation request.
+
+If the scenario does not exist or the user lacks permission to access it, return an appropriate error and prevent execution.
+
+### Scenario fields
+
+Support the appropriate equivalent of:
+
+- ID.
+- Name.
+- Description.
+- Business goal.
+- User instructions.
+- Test inputs.
+- Expected behaviors.
+- Prohibited behaviors.
+- Deterministic rules.
+- LLM evaluation criteria.
+- Provider constraints.
+- Creator/workspace ownership.
+- Created and updated timestamps.
+- Version.
+
+Use the existing data model where possible.
+
+Snapshot the scenario, test inputs, rules, and LLM rubric at run time so historical reports remain reproducible.
+
+---
+
+## 9. TEMPLATE OR CUSTOM JSON
+
+When creating a scenario, the user must be able to choose either a template or custom JSON instructions.
+
+### Option A — Existing template
+
+Support the existing or newly implemented templates:
+
+**Customer Support and Receptionist**
+
+Test intent understanding, information gathering, policy adherence, tool usage, issue resolution, routing, and closing behavior.
+
+**Incident Response**
+
+Test incident recognition, information collection, severity handling, permitted tool use, escalation, and next-step confirmation.
+
+**Language Practitioner**
+
+Test configured language use, proficiency level, corrections, exercise adherence, and response to misunderstandings.
+
+Templates are editable starting points. They must not prevent users from defining their own scenarios.
+
+### Option B — Custom JSON
+
+Allow users to supply a valid JSON configuration containing their instructions, business goal, test inputs, expected behavior, and relevant criteria.
+
+Example:
+
+```json
+{
+  "goal": "Determine whether the customer qualifies for a refund.",
+  "instructions": [
+    "Ask for the customer's order number.",
+    "Verify the refund policy.",
+    "Do not promise a refund before eligibility is confirmed."
+  ]
+}
+```
+
+Validate the JSON schema, required fields, data types, size limits, and provider-specific restrictions where applicable.
+
+Return actionable validation errors. Do not silently rewrite malformed JSON or discard user instructions.
+
+Store the user's original configuration and any normalized representation separately when needed.
+
+Treat custom JSON and instructions as untrusted input. They must never override system-level security rules.
+
+---
+
+## 10. USER-DEFINED TEST INSTRUCTIONS
+
+The user must be able to describe exactly what they want to test in plain English.
+
+Examples:
+
+- "Ask the agent for a refund after explaining that the product arrived damaged."
+- "Ask the receptionist to reschedule an appointment and verify whether it collects all required information."
+- "Report a failed payment and check whether the agent follows the configured escalation policy."
+- "Tell the agent that a support ticket was never received and verify that it does not falsely claim the issue is resolved."
+
+Persist the original user instructions with the evaluation run.
+
+Do not replace them with generic template instructions unless the user chooses to use those instructions.
+
+If a template is selected, combine it with the user's modifications according to an explicit, documented precedence rule. Never silently discard the user's requirements.
+
+---
+
+## 11. GHOST CALLER EXECUTION
+
+Novora must act as an automated caller/customer simulator.
+
+Where the provider supports the necessary interface, Novora should:
+
+1. Establish a supported connection or session.
+2. Send the user's test inputs.
+3. Receive actual agent responses and events.
+4. Observe tool calls and results when available.
+5. Stop according to explicit completion, turn limits, cancellation, or timeout.
+6. Persist the interaction evidence.
+7. Run the configured evaluations.
+
+The user chooses what the ghost caller says.
+
+Novora should not invent the agent's responses or report an unexecuted test as completed.
+
+If a provider requires audio, use the supported audio-input workflow. If it supports text injection, use the documented text-input mechanism. If neither method is supported for the selected configuration, report the limitation and offer a supported execution mode where available.
+
+### Execution-mode distinctions
+
+Represent execution modes explicitly, for example:
+
+- Provider-supported conversation test.
+- Direct webhook contract test.
+- Offline/mock test.
+
+The UI and report must state which mode was used.
+
+A direct webhook test may validate payload shape, endpoint behavior, latency, and returned results. It does not prove that the full voice agent correctly interpreted a conversation unless the actual agent execution path was exercised.
+
+---
+
+## 12. ELEVENLABS ADAPTER
+
+Audit and reuse the existing ElevenLabs implementation.
+
+Use official documentation:
+
+- https://elevenlabs.io/docs/eleven-agents/api-reference/eleven-agents/websocket
+- https://elevenlabs.io/docs/eleven-agents/customization/events/client-to-server-events
+- https://elevenlabs.io/docs/eleven-agents/libraries/web-sockets
+
+Where supported, use the documented WebSocket interface and `user_message` event for text input.
+
+Implement or repair:
+
+- Agent identification and configuration.
+- Credential validation.
+- Session initialization.
+- Supported test input submission.
+- Transcript and response collection.
+- Tool-call and tool-result collection where available.
+- Session completion.
+- Error and disconnect handling.
+- Event normalization.
+- Evaluation and report persistence.
+
+Do not duplicate a working WebSocket client.
+
+Do not assume a tool invocation succeeded merely because the model requested it.
+
+### Acceptance test
+
+With mocked provider events, verify the entire workflow without live credentials.
+
+With approved test credentials, run an opt-in live test that:
+
+1. Connects to a configured test agent.
+2. Submits the user-defined test input.
+3. Receives actual events.
+4. Captures available evidence.
+5. Runs deterministic and LLM evaluation.
+6. Persists the report.
+7. Retrieves the report through the API.
+
+Record whether the workflow was mock-tested or live-verified.
+
+---
+
+## 13. ASSEMBLYAI ADAPTER
+
+Reuse the shared ghost-caller runtime, event model, evaluator, and reporting system.
 
 Official documentation:
-https://elevenlabs.io/docs/eleven-agents/api-reference/eleven-agents/websocket
 
-### AssemblyAI
+- https://www.assemblyai.com/docs/voice-agents/voice-agent-api
+- https://www.assemblyai.com/docs/voice-agents/voice-agent-api/events-reference
 
-AssemblyAI does not follow the same prebuilt-agent model as ElevenLabs. Support its Voice Agent API configuration using the system prompt and supported tools.
+Implement the documented Voice Agent API protocol.
 
-Use the official WebSocket endpoint and event contract. Verify the currently documented input protocol before implementing a text-only ghost-caller flow.
+Do not assume it uses the same input events as ElevenLabs.
 
-The initial implementation must not assume that an undocumented `text_input` event exists.
+In particular, do not introduce an undocumented `text_input` event merely to make the adapters look identical.
 
-If text-only injection is unsupported, expose the supported execution mode, such as generated or prerecorded audio input where appropriate, or explicitly mark text-only simulation as unavailable.
+Where audio is required:
 
-Capture supported events such as:
+1. Accept the user's text-based test instructions.
+2. Convert them to audio using an appropriate supported method or configured audio fixtures.
+3. Apply the provider's documented audio encoding and session requirements.
+4. Submit input only after the required session handshake.
+5. Capture transcripts, agent responses, tool calls/results, interruptions, completion, and errors where available.
+6. Normalize the evidence.
+7. Reuse the same evaluation engine and reporting pipeline.
 
-- `transcript.user`
-- `transcript.agent`
-- `reply.started`
-- `reply.done`
-- `tool.call`
-- `tool.result`
-- Session errors and interruptions
+Keep audio-specific behavior inside the AssemblyAI adapter.
 
-Ensure tool execution is controlled by the backend and uses explicitly registered, approved tools.
+If the existing application already has an audio generation or fixture pipeline, reuse it.
 
-Official documentation:
-https://www.assemblyai.com/docs/voice-agents/voice-agent-api
+Do not claim that a text-only simulation ran if the provider required audio and no valid audio input was submitted.
 
-### Vapi
+---
 
-Create a dedicated Vapi adapter and configuration workflow.
+## 14. VAPI AND RETELL: PAYLOAD GENERATION AND VALIDATION
 
-Use the official API to validate configuration and implement only verified test operations.
+For Vapi and Retell, implement the requested payload-generation workflow for supported execution modes.
 
-Support configured assistants, relevant tools, and available call/test artifacts according to the documented API.
+The user may supply:
 
-Do not place real outbound calls automatically. Require explicit authorization and confirmation for test modes that can contact real telephone numbers or incur charges.
-
-Prefer safe staging configurations and non-production targets.
-
-Official documentation:
-https://docs.vapi.ai/api-reference/assistants/create
-https://docs.vapi.ai/api-reference/calls/create
-
-### Retell
-
-Create a separate Retell adapter, configuration model, and capability description.
-
-Read the official Retell API documentation before implementing calls, simulations, or test execution.
-
-Do not assume that Retell supports the same text-message injection protocol as ElevenLabs. Implement only verified supported behavior and make unavailable modes explicit.
-
-Documentation index:
-https://docs.retellai.com/llms.txt
-
-## 5. Normalized conversation and event contracts
-
-Define provider-neutral data models for:
-
-- Provider configuration reference.
-- Agent configuration reference.
+- Agent ID.
+- Provider selection.
 - Scenario.
-- Evaluation criteria.
-- Test case.
-- Test run.
-- Conversation turn.
-- Normalized provider event.
-- Tool call.
-- Tool result.
-- Deterministic check result.
-- LLM judge result.
-- Final evaluation report.
-- Batch evaluation.
-- Integration health status.
+- Plain-English test instructions.
+- Custom JSON configuration.
+- Expected tool behavior.
+- Provider-specific settings.
+- An approved test endpoint for direct webhook testing, if applicable.
 
-Preserve provider-specific metadata in a validated, bounded metadata field where necessary, without leaking credentials or uncontrolled payloads into the domain model.
+The payload must be generated according to the selected provider's actual API or webhook contract.
 
-Every event should carry appropriate identifiers, timestamps, and ordering information where available.
+Do not use one generic payload structure for both providers.
 
-Normalize provider differences without erasing important information such as interrupted replies, tool-call failures, session errors, or missing results.
+Verify the current provider documentation before implementing or updating payload schemas:
 
-## 6. Deterministic evaluation engine
+- Vapi: https://docs.vapi.ai/
+- Retell: https://docs.retellai.com/llms.txt
 
-Build a reusable, extensible deterministic evaluation engine.
+### Payload pipeline
 
-Support more than basic keyword matching.
+Implement the following controlled process:
 
-Implement suitable rule types, including:
+```text
+User instructions and configuration
+                ↓
+Provider-specific payload generator
+                ↓
+Generated payload
+                ↓
+Schema and contract validator
+                ↓
+Independent LLM payload reviewer
+                ↓
+          Is it valid?
+           /       \
+         YES        NO
+          ↓          ↓
+    Execution     Correction
+                     ↓
+              Revalidate payload
+```
 
-- Required phrase or concept.
-- Prohibited phrase or behavior.
+The payload must be generated based on the selected provider, agent ID, supported operation, scenario, and user's instructions.
+
+### Important distinction
+
+Use a deterministic schema/contract validator as the authoritative check for structural validity, required fields, allowed values, and types.
+
+Use the LLM reviewer as a semantic quality gate to check whether the generated payload accurately represents the user's intent and selected provider operation.
+
+**The LLM reviewer must not override a deterministic schema failure.**
+
+A payload that is syntactically valid but semantically inconsistent with the user's instructions must not be executed without correction.
+
+### Payload generation requirements
+
+The generator should receive:
+
+- Selected provider.
+- Relevant official or repository-maintained provider schema.
+- Provider capabilities.
+- Agent ID.
+- Execution mode.
+- Scenario snapshot.
+- User instructions.
+- Custom JSON, when supplied.
+- Expected behavior.
+- Allowed operations and constraints.
+
+Return structured output containing the proposed payload and a concise explanation of how it maps to the user's request.
+
+Validate generated JSON before attempting to use it.
+
+Do not let the model invent unsupported fields or fabricate an agent ID.
+
+### Correction loop
+
+If validation or semantic review fails:
+
+1. Return the specific validation errors to the generator.
+2. Ask it to revise the payload while preserving the user's original intent.
+3. Validate the revised payload again.
+4. Repeat only up to a configurable maximum number of revisions.
+5. If the maximum is reached, mark the payload preparation as failed and return actionable errors.
+
+Never create an infinite generation loop.
+
+Never execute a payload that fails required validation.
+
+Persist the revision count and final validation result. Store revision artifacts only as needed for debugging and auditing.
+
+### Execution safety
+
+Before dispatching a generated payload:
+
+- Verify the target and execution mode.
+- Confirm required credentials and agent configuration.
+- Validate the endpoint or provider operation.
+- Enforce timeouts and response-size limits.
+- Prevent server-side request forgery by restricting endpoint destinations and blocking private or otherwise prohibited targets unless explicitly supported and safely authorized.
+- Prevent unauthorized calls, destructive operations, and unintended production side effects.
+- Require explicit confirmation where the selected operation can incur charges or contact real users.
+
+Do not execute a webhook payload against an arbitrary URL supplied by the user without appropriate validation and authorization.
+
+### Evidence after execution
+
+Capture the actual response, HTTP status, latency, relevant headers, structured errors, and provider artifacts where available.
+
+Do not treat HTTP 200 alone as proof that the business objective succeeded.
+
+The evaluator must assess the actual result against the expected outcome.
+
+---
+
+## 15. HUGGING FACE LLM-AS-A-JUDGE
+
+Use Hugging Face-hosted models as the supported model source for LLM-as-a-judge evaluation, using the repository's existing LLM integration patterns where possible.
+
+The requested models are:
+
+- DeepSeek model.
+- Llama 3.3 8B model.
+
+Do not assume a particular model identifier or provider endpoint without verifying availability and compatibility. Configure the exact model IDs through environment variables or backend settings, and document the verified defaults.
+
+For example, define configurable settings such as:
+
+- `HF_TOKEN`
+- `HF_JUDGE_MODEL`
+- `HF_GENERATOR_MODEL`
+- `HF_EVALUATOR_MODEL`
+
+Use separate generator and judge configuration where the architecture requires different models or roles.
+
+The application must not expose Hugging Face tokens to the frontend.
+
+### Model roles
+
+Use the configured DeepSeek and Llama 3.3 8B models for the generator and evaluator roles according to the supported deployment configuration.
+
+Prefer separating generation from judging so the judge independently assesses the generator's output.
+
+The system must support model configuration without requiring code changes.
+
+If a model is unavailable, rate-limited, incompatible with the selected endpoint, or unconfigured, report that condition explicitly. Do not silently substitute an unrelated model while claiming the requested model was used.
+
+### LLM judge responsibilities
+
+Evaluate:
+
+- Whether the agent understood the user's intent.
+- Whether the agent followed the scenario instructions.
+- Whether required information was collected.
+- Whether the response was relevant and clear.
+- Whether the agent followed configured policies.
+- Whether the agent resolved or appropriately escalated the issue.
+- Whether the required tool behavior occurred.
+- Whether the returned business result matches the expected outcome.
+- Whether the generated provider payload represents the user's intended test.
+
+Use structured JSON output validated against a schema.
+
+Each result should include:
+
+- Criterion ID.
+- Verdict.
+- Concise rationale.
+- Evidence references.
+- Confidence, if supported by the selected model and output schema.
+- Model identifier.
+- Evaluation status.
+
+Do not store hidden chain-of-thought. Persist concise explanations and evidence-backed conclusions.
+
+Treat user instructions, transcripts, tool results, provider responses, and generated payloads as untrusted data. Prompt injection inside those inputs must never override judge instructions or authorize tool execution.
+
+---
+
+## 16. USER-DEFINED DETERMINISTIC RULES
+
+Users must be able to add their own deterministic evaluation rules.
+
+Add the minimum necessary control to the existing UI, such as an **Add Deterministic Rule** button, using existing styling.
+
+The backend must support creating, validating, storing, editing, and executing user-defined rules.
+
+Supported rule types should include, where appropriate:
+
+- Required phrase or keyword.
+- Prohibited phrase or keyword.
 - Required information collected.
 - Required question asked.
 - Expected tool call.
 - Forbidden tool call.
-- Tool argument validation.
-- Tool-call ordering.
-- Tool result validation.
+- Tool argument matches a specified value or schema.
+- Required tool result.
 - Required escalation.
-- Required confirmation before a sensitive action.
-- Required closing or next step.
-- Maximum or minimum turn constraints.
-- Conversation completion.
-- Required evidence availability.
-- Policy compliance using structured rules.
-- Expected response structure where deterministic validation is appropriate.
-- Timeout and execution failure detection.
+- Required confirmation.
+- Maximum turns or duration.
+- Required final response or next step.
+- Latency threshold.
+- HTTP status or response-field expectation for direct webhook tests.
 
-Do not force every natural-language criterion into brittle string matching.
+Use a typed rule schema rather than accepting arbitrary executable Python or JavaScript.
 
-Represent each rule with a stable identifier, type, configuration, severity, and result.
+For each rule, persist:
 
-Each result should include:
+- Rule ID.
+- Name.
+- Description.
+- Rule type.
+- Configuration.
+- Severity.
+- Whether it is required.
+- Applicable execution modes.
+- Creation and update timestamps.
 
-- PASS, FAIL, or INCONCLUSIVE.
-- A concise explanation.
-- Evidence references.
-- The rule identifier.
-- Relevant observed events or transcript excerpts.
-- Any validation error.
+Validate rules before running an evaluation.
 
-A missing event is not automatically proof of failure if the provider session ended prematurely or required evidence was unavailable. Use INCONCLUSIVE where the result cannot be reliably determined.
+Return `PASS`, `FAIL`, or `INCONCLUSIVE` with evidence references.
 
-## 7. LLM-as-judge evaluation
+Critical failures must remain visible even when the LLM judge produces a favorable result.
 
-Implement an LLM judge as a separate service behind a provider-neutral interface.
+---
 
-The judge should assess criteria that require semantic understanding, such as:
+## 17. USER-DEFINED LLM EVALUATIONS
 
-- Whether the agent understood the user's intent.
-- Whether the response addressed the request.
-- Whether the agent remained within the defined role.
-- Whether the conversation followed the specified policy.
-- Whether a clarification was appropriate.
-- Whether the agent's explanation was helpful and relevant.
-- Whether the agent handled frustration or ambiguity appropriately.
-- Whether a language-practice response matched the requested learning level.
-- Whether an incident-response conversation followed the intended process.
-- Whether a customer-support interaction reached an acceptable resolution.
+Users must also be able to define custom LLM evaluation criteria.
 
-Each judge request must receive the specific scenario, configured rubric, relevant transcript, and permitted event evidence.
+Add the minimum necessary **Add LLM Evaluation** control using the existing frontend design.
 
-Require structured output validated against a schema. Include the criterion identifier, result, concise rationale, evidence references, and confidence or uncertainty where supported.
+Users should be able to define criteria in natural language, such as:
 
-Treat transcripts, tool outputs, provider payloads, and user-provided scenario content as untrusted data. They must never override the judge's instructions or authorize tool execution.
+- "Check whether the agent apologized before offering a resolution."
+- "Check whether the agent gathered all required customer details."
+- "Check whether the agent clearly explained why the refund was denied."
+- "Check whether the agent followed the escalation policy."
+- "Check whether the agent avoided claiming that an action succeeded without evidence."
 
-Do not ask the judge to reveal chain-of-thought. Store concise explanations grounded in evidence.
+Persist these criteria with the scenario and snapshot them for each evaluation run.
 
-Support configurable rubrics and model settings through server-side configuration.
+The judge must evaluate each criterion independently using the available conversation and tool evidence.
 
-If no LLM provider is configured, report the judge as unavailable instead of silently returning a successful result.
+Each result must include a verdict, concise explanation, evidence references, and an explicit inconclusive state when the evidence is insufficient.
 
-## 8. Combined evaluation orchestration
+Do not permit custom evaluation instructions to override security rules, alter the provider configuration, or execute arbitrary tools.
 
-Implement a deterministic-plus-LLM evaluation pipeline.
+---
 
-Suggested sequence:
+## 18. EVALUATION EXECUTION AND RESULT AGGREGATION
 
-1. Validate the scenario and provider configuration.
-2. Execute the test.
-3. Persist normalized events and execution status.
-4. Run deterministic checks against the observed evidence.
-5. Run LLM judgments against the configured semantic criteria.
-6. Validate the judge output.
-7. Combine results using explicit aggregation rules.
-8. Persist the report.
-9. Return the report and evidence references to the frontend.
+When a run starts:
 
-The LLM judge must evaluate configured deterministic criteria where useful, but it cannot rewrite the deterministic results.
+1. Validate user/workspace access.
+2. Validate the provider and agent configuration.
+3. Confirm that the scenario exists and is accessible.
+4. Snapshot the scenario and evaluation criteria.
+5. Validate the execution mode.
+6. Generate and validate any required payload.
+7. Execute the supported provider or webhook test.
+8. Persist actual events and response evidence.
+9. Run all configured deterministic rules.
+10. Run all configured LLM evaluation criteria.
+11. Aggregate the outcomes.
+12. Persist and expose the final report.
 
-Preserve the distinction between:
+Keep these results separate:
 
-- Deterministic outcome.
-- LLM judge outcome.
-- Final aggregated outcome.
 - Execution status.
-
-A failed critical deterministic safety rule must not be overridden by a favorable LLM judgment.
-
-Use configurable severity and aggregation policies. Default to conservative behavior when critical evidence is missing.
-
-For example:
-
-- A prohibited tool call was observed: deterministic FAIL.
-- The judge believes the conversation sounded appropriate: LLM PASS.
-- The critical rule still fails in the final report.
-
-Likewise, a timeout or provider error should be represented as an execution failure or inconclusive evaluation, not an ordinary agent failure without supporting evidence.
-
-## 9. Tool-call verification and execution safety
-
-Novora must evaluate what the provider agent actually attempted and what happened afterward.
-
-Capture:
-
-- Tool name.
-- Requested arguments.
-- Invocation time.
-- Execution status.
-- Returned result, with sensitive values redacted.
-- Failure information.
-- Correlation identifier.
-
-Never execute arbitrary tool names or arguments emitted by an agent.
-
-Use an explicit registry of permitted tools and validated argument schemas. Enforce timeouts and restrict access to registered integrations.
-
-Distinguish an attempted action from a completed action. A tool-call event alone does not prove that a refund, booking, database mutation, or other external action succeeded.
-
-For evaluation runs, prefer sandbox data, mocked external effects, or read-only tools unless the user has explicitly configured and authorized a real test environment.
-
-Do not allow an evaluation to trigger destructive production operations by default.
-
-## 10. PostgreSQL relational persistence
-
-Use the existing PostgreSQL setup and migration system.
-
-Design proper relational entities and foreign keys rather than storing the entire application state in one JSON document.
-
-The model should support relationships among:
-
-- Users.
-- Provider integrations.
-- Provider-specific configuration references.
-- Agents.
-- Scenarios.
-- Scenario criteria.
-- Test cases.
-- Evaluation runs.
-- Batch runs.
-- Run-to-test associations.
-- Conversation events.
+- Payload preparation status.
 - Deterministic results.
 - LLM judge results.
-- Final reports.
-- Tool-call evidence.
+- Aggregate evaluation outcome.
+- Warnings and errors.
 
-Adapt to the existing authentication and workspace model. Do not introduce a second competing user model.
+Use a documented, conservative aggregation policy.
 
-Add appropriate indexes, unique constraints, timestamps, cascading behavior, and transactional boundaries.
+A critical deterministic failure cannot be overturned by a favorable LLM verdict.
 
-Keep provider secrets out of ordinary relational fields and API responses. Prefer encrypted secret storage or a documented server-side secret-management mechanism.
+If the run failed before sufficient evidence was captured, report an execution failure or inconclusive result as appropriate.
 
-Use database migrations. Never reset or drop user data to simplify a schema change.
+If the LLM judge fails, retain the deterministic results and report the judge failure separately. Never invent a successful LLM evaluation.
 
-## 11. Evaluation history and batch execution
+A successful transport connection or HTTP response is not sufficient to declare the business objective achieved.
 
-Implement persistent evaluation history.
+---
 
-Users must be able to:
+## 19. DATABASE, VERSIONING, AND HISTORY
 
-- View previous evaluations.
-- Filter by provider, scenario, status, and time where supported.
-- Open a report.
-- Re-run an existing evaluation.
-- Run multiple selected test cases as a batch.
-- Track each test's status within a batch.
-- Inspect failed and inconclusive runs.
-- Compare results between runs where criteria and versions permit meaningful comparison.
+Inspect the current database schema and migrations before making changes.
 
-A batch must persist independently of the browser session.
+Extend existing models where possible.
 
-Use background jobs if execution duration requires them. Reuse existing queue infrastructure if present; do not introduce a new queue solely for architectural fashion.
+Ensure the existing schema or its minimal extension can persist:
 
-Support idempotency, bounded retries, timeouts, cancellation where feasible, and explicit partial-failure reporting.
+- Provider integrations.
+- Agent configurations.
+- Scenarios and versions.
+- Test instructions.
+- Deterministic rules.
+- LLM evaluation criteria.
+- Evaluation runs.
+- Payload-generation attempts.
+- Payload-validation results.
+- Normalized events.
+- Tool calls and results.
+- Deterministic evaluation results.
+- LLM judge results.
+- Aggregate reports.
+- Batch runs and per-run outcomes.
+- Execution errors and relevant metadata.
 
-A batch that contains failed or inconclusive cases must not be represented as entirely successful.
+Enforce ownership and workspace isolation at the API and data-access layers.
 
-## 12. Provider configuration and integration health
+Store scenario and criteria snapshots for historical reproducibility.
 
-Provide backend APIs to:
+Do not create duplicate tables for existing concepts.
 
-- List supported providers and capabilities.
-- Create or update an integration.
-- Validate a provider configuration.
-- Test provider connectivity.
-- List or validate available agents where supported.
-- Initiate an evaluation.
-- Retrieve run status and report.
-- Retrieve evaluation history.
-- Create and inspect batch evaluations.
-- Retrieve provider health and error information.
+Do not introduce a new database or queue unless the audit demonstrates a concrete need.
 
-A provider configuration should clearly distinguish missing credentials, invalid credentials, unsupported operations, and connection failures.
+Use migrations and indexes appropriate to the query patterns.
 
-Use masked credentials and server-side secret handling.
+---
 
-Provider keys supplied by the platform operator belong in server environment variables or the configured secret manager. User-owned provider keys must be stored according to the application's existing secure credential model, not inserted into the operator's `.env` file.
+## 20. API CONTRACTS
 
-## 13. API contract and frontend coordination
+Audit the existing API and preserve current route conventions.
 
-Before implementing all routes, publish the shared schemas and endpoint definitions.
+Ensure the backend exposes the equivalent functionality for:
 
-Coordinate with Claude B so the frontend can use stable contracts for:
+- Listing providers and actual capabilities.
+- Configuring and validating provider integrations.
+- Configuring an agent.
+- Listing, creating, updating, and retrieving scenarios.
+- Selecting a scenario for evaluation.
+- Managing templates and custom JSON.
+- Managing deterministic rules.
+- Managing LLM evaluation criteria.
+- Generating and validating a provider payload.
+- Starting an evaluation run.
+- Retrieving run status and progress.
+- Retrieving transcripts and event evidence.
+- Retrieving deterministic and LLM results.
+- Retrieving reports and history.
+- Starting and retrieving batch evaluations.
 
-- Provider selection.
-- Agent configuration.
-- Scenario templates.
-- Criteria editing.
-- Evaluation execution.
-- Batch runs.
-- Evaluation history.
-- Reports and evidence.
-- Integration status.
+Use the existing FastAPI request and response patterns.
 
-Do not have the frontend engineer guess response shapes or invent endpoints.
+Validate inputs with typed schemas.
 
-Maintain backward compatibility where practical.
+Return consistent, actionable error responses.
 
-## 14. Security and reliability
+Do not break existing API contracts without documenting the change and checking compatibility with the current frontend.
 
-Implement:
+---
 
-- Server-side credential handling.
-- Request validation.
-- Authentication and authorization on protected routes.
-- Per-user or per-workspace data scoping consistent with the existing architecture.
-- Provider timeout and error handling.
-- Webhook signature verification where applicable.
-- Idempotent event processing.
+## 21. SECURITY AND SAFETY
+
+Implement or preserve:
+
+- Server-side secret storage.
+- Credential masking.
+- Authentication and authorization.
+- Workspace isolation.
+- Provider payload validation.
+- Strict schema validation.
+- SSRF protections for user-supplied test endpoints.
+- Request timeouts and response-size limits.
 - Safe logging and redaction.
-- Bounded payload sizes.
-- Rate limits where appropriate.
-- Strict allowlisting of executable tools.
-- Safe handling of untrusted transcripts and tool results.
-- Protection against duplicate execution and unintended external side effects.
+- Webhook signature verification where supported.
+- Idempotency for retried requests and duplicate events.
+- Read-only or sandboxed defaults for tool execution.
+- Explicit confirmation for potentially expensive or destructive live operations.
+- Protection against prompt injection in transcripts and JSON.
+- Bounded retries and bounded LLM correction loops.
 
-Do not log API keys, session tokens, or full sensitive payloads by default.
+Never execute arbitrary code supplied in custom JSON or evaluation criteria.
 
-## 15. Tests and acceptance criteria
+Never let the LLM judge or payload generator bypass deterministic validation or authorization.
 
-Write unit tests for deterministic rules, judge-output validation, aggregation policy, provider event normalization, and database relationships.
+Never log private credentials or expose them to the browser.
 
-Write integration tests using mocked provider responses, without requiring paid provider calls in the normal test suite.
+---
 
-Add opt-in live integration tests that run only when the necessary credentials and safe test-agent IDs are configured.
+## 22. TESTING REQUIREMENTS
 
-The backend milestone is complete when a developer can:
+Testing is mandatory.
 
-1. Configure a supported provider.
-2. Create a scenario and evaluation criteria.
-3. Submit a test conversation or execute a supported provider test.
-4. Capture actual observed conversation events and tool calls.
-5. Run deterministic and LLM-based evaluations.
-6. Persist a complete evidence-backed report.
-7. Retrieve the report and history after restarting the application.
-8. Run multiple evaluations and inspect partial failures.
-9. See clear errors when provider functionality is unavailable.
+### A. Provider contract tests
 
-Run tests, lint, type checks, migrations, and relevant build commands. Report actual results, not assumed results.
+Create reusable tests for each adapter covering:
 
-Do not claim a provider integration is complete until it has been verified against its actual API or clearly identified as mocked or awaiting credentials.
+- Configuration validation.
+- Connection and initialization.
+- Supported input delivery.
+- Event normalization.
+- Transcript and artifact handling.
+- Tool calls and results.
+- Unknown and malformed events.
+- Duplicate events.
+- Timeouts and disconnections.
+- Unsupported capability reporting.
+- Consistent lifecycle and error behavior.
 
-Deliver modular, typed, maintainable code. Keep each source file below 200 lines.
+### B. Scenario tests
 
+Verify:
 
-The distinction is that the backend prompt prioritizes ElevenLabs as the first end-to-end implementation, while the other providers must use their verified capabilities.
-Prompt	Scope
-Claude A — Backend	Shared evaluation engine + provider adapters for ElevenLabs, AssemblyAI, Vapi, and Retell
+- Scenario creation and retrieval.
+- Template-based scenarios.
+- Custom JSON validation.
+- Missing scenario handling.
+- Invalid scenario IDs.
+- Ownership and authorization.
+- Snapshot persistence.
+- Historical results remaining unchanged after edits.
 
-For Novora, I'd structure it like this:
-- Shared code: scenario management, test orchestration, evaluation criteria, LLM judging, report generation, persistence, and dashboard APIs.
-- Provider-specific code: connection setup, authentication, session initialization, sending test input, receiving events, and handling provider-specific errors.
-- Input adapter: translates Novora's standard test message into whatever input format the provider actually supports.
-The one thing I'd verify
-The official protocols don't quite support the assumption that only a field name changes:
-- ElevenLabs: its Agents WebSocket documents a user_message event for text input. 
-  
-  ElevenLabs Documentation
-- AssemblyAI: its Voice Agent WebSocket documents input.audio for caller input, plus session configuration and conversation events. I couldn't verify a matching text_input event in its documented event reference
+### C. Deterministic evaluation tests
 
-The key is to get one complete integration working, then reuse its shared code for the other providers instead of rebuilding the platform.
+Verify:
 
-The implementation plan
-Get ElevenLabs working end to end first.
+- Passing rules.
+- Failing rules.
+- Inconclusive rules.
+- User-defined rules.
+- Tool argument validation.
+- Missing evidence.
+- Critical failure handling.
+- Webhook status, latency, and response validation where applicable.
 
-Connect an agent, run a test conversation, capture events, evaluate the conversation, and save a report. Verify that the entire workflow works—not just the connection.
+### D. Payload generation tests
 
-Reuse the shared code for AssemblyAI.
+Verify:
 
-Keep your scenario engine, evaluation logic, LLM judge, database models, and reporting. Adapt the provider connection and input/output handling to AssemblyAI's actual protocol.
+- Provider-specific schemas.
+- Correct agent ID use.
+- Correct mapping of user intent.
+- Invalid JSON handling.
+- Schema rejection.
+- LLM reviewer rejection.
+- Bounded revision loops.
+- Failure after maximum revisions.
+- No execution of invalid payloads.
+- Prevention of unauthorized endpoint requests.
 
-Repeat for Vapi and Retell.
+### E. LLM judge tests
 
-Reuse the same core, adding only the provider-specific integration code and any capability differences.
+Use mocked model responses to verify:
 
-Test each provider independently.
+- Valid structured verdicts.
+- Invalid output.
+- Missing evidence.
+- Unsupported claims.
+- Prompt-injection resistance.
+- Model timeout and rate-limit handling.
+- Unavailable-model behavior.
+- Separation between deterministic and LLM outcomes.
 
-Verify that each one can execute a test and return real evidence before marking it as supported in Novora.
+### F. Integration and end-to-end tests
 
-What you reuse vs. what you change
-Reuse across all providers
+Test the entire workflow:
 
-Adapt for each provider
+1. Select provider.
+2. Configure an agent.
+3. Create or select a scenario.
+4. Add custom instructions.
+5. Add deterministic rules.
+6. Add LLM evaluation criteria.
+7. Generate and validate any required payload.
+8. Execute a mocked or approved live provider test.
+9. Capture and persist evidence.
+10. Evaluate the evidence.
+11. Retrieve the report.
 
-Scenarios and test cases
+Ordinary CI must use mocked provider interactions and mocked LLM responses where appropriate.
 
-Authentication and connection
+Live tests must be opt-in and require explicitly configured test credentials and safe test targets.
 
-Deterministic evaluation engine
+Never claim that a live provider was tested when only mocks were used.
 
-Input message or audio format
+---
 
-LLM-as-judge
+## 23. IMPLEMENTATION CONSTRAINTS
 
-Session initialization
+- Preserve the existing stack and established architecture.
+- Do not redesign the frontend.
+- Do not rewrite unrelated modules.
+- Reuse working provider integrations.
+- Avoid unnecessary dependencies.
+- Avoid giant files; keep source files under 200 lines where reasonably achievable, excluding generated files and unavoidable configuration/migration artifacts.
+- Split large modules into focused components.
+- Use typed interfaces and schemas.
+- Do not create microservices or Kubernetes infrastructure for this task.
+- Do not introduce fake data into production paths.
+- Do not return fake successful evaluations.
+- Do not claim unsupported provider capabilities.
+- Do not silently swallow exceptions.
+- Do not overwrite `.env` or commit secrets.
+- Do not mark tests as passed unless they were actually executed.
 
-Database and evaluation history
+---
 
-Event and tool-call mapping
+## 24. EXECUTION PLAN
 
-Reports and dashboard
+Complete the work in reviewable stages.
 
-Error handling and supported capabilities
+### Stage 1 — Audit
 
-One important caution: don't assume AssemblyAI, Vapi, and Retell differ only in the name of a text_input field. Verify their supported testing interfaces first. If their input methods differ, isolate that difference in the adapter.
+Inspect the existing repository, identify the scenario lookup bug, trace the current provider execution paths, and document the gaps.
 
-The result is one Novora platform with multiple provider integrations—not four separate implementations.
+### Stage 2 — Contracts and shared core
+
+Implement or repair the shared provider contract, normalized events, scenario validation, deterministic evaluation, LLM evaluation interface, and persistence.
+
+### Stage 3 — Hugging Face judge
+
+Configure the requested DeepSeek and Llama 3.3 8B models through verified Hugging Face-compatible endpoints. Implement structured output validation, timeout handling, and mocked tests.
+
+### Stage 4 — ElevenLabs
+
+Repair or complete the existing ghost-caller workflow and verify the full evaluation pipeline.
+
+### Stage 5 — AssemblyAI
+
+Implement its documented input and event protocol using the shared core.
+
+### Stage 6 — Vapi and Retell
+
+Implement provider-specific payload generation and validation, supported agent execution, direct webhook contract testing where requested, and evidence-backed evaluation.
+
+### Stage 7 — Custom rules and workflow
+
+Complete user-defined deterministic rules, user-defined LLM criteria, scenario selection, template/custom JSON validation, and run prerequisites.
+
+### Stage 8 — Testing and hardening
+
+Run unit, contract, integration, migration, API, and end-to-end tests. Fix failures and document limitations.
+
+Do not make unrelated frontend changes at any stage.
+
+---
+
+## 25. DEFINITION OF DONE
+
+The work is complete only when:
+
+- The correct backend branch is used.
+- Existing frontend designs remain unchanged.
+- The missing-scenario error is fixed at its root cause.
+- Users cannot start an evaluation without a valid scenario and required agent ID.
+- Users can create a scenario or select an existing one.
+- Users can select a template or supply validated custom JSON.
+- Users can write their own test instructions.
+- Users can add their own deterministic rules.
+- Users can add their own LLM evaluation criteria.
+- ElevenLabs uses its documented execution protocol.
+- AssemblyAI uses its documented execution protocol.
+- Vapi and Retell have provider-specific, schema-validated payload generation where applicable.
+- Generated payloads are reviewed, corrected within a bounded loop, and validated before execution.
+- Hugging Face model configuration supports the requested DeepSeek and Llama 3.3 8B models using verified model IDs and endpoints.
+- Actual events and responses are captured and persisted.
+- Deterministic and LLM evaluation results remain separately visible.
+- Critical deterministic failures cannot be hidden by the LLM judge.
+- Reports are reproducible and evidence-backed.
+- Provider contract tests and failure-path tests pass.
+- Unsupported capabilities are reported honestly.
+- Documentation matches the actual implementation.
+
+---
+
+## 26. FINAL ENGINEERING REPORT
+
+At completion, report:
+
+1. Initial repository findings.
+2. Root cause of the scenario lookup error.
+3. Files created and modified.
+4. Shared architecture changes.
+5. Provider-specific implementation status.
+6. ElevenLabs and AssemblyAI execution results.
+7. Vapi and Retell payload and execution results.
+8. Hugging Face model IDs and endpoints actually configured.
+9. Deterministic and LLM evaluation behavior.
+10. Database migrations and API changes.
+11. Contract, unit, integration, and end-to-end tests run.
+12. Commands executed and their actual outcomes.
+13. Security and reliability changes.
+14. Known limitations and remaining work.
+
+Clearly distinguish:
+
+- Implemented.
+- Unit-tested.
+- Contract-tested.
+- Mocked end-to-end tested.
+- Live-verified.
+- Not yet implemented.
+
+**Begin with the repository audit. Preserve the existing frontend design. Work only on `feat/provider-evaluation-engine`. Fix the existing scenario bug, build the shared evaluation core, prove the ElevenLabs workflow, and extend it to the remaining providers without duplicating the platform.**

@@ -10,6 +10,7 @@ class RuleStatus(str, Enum):
     PASS = "PASS"
     FAIL = "FAIL"
     INCONCLUSIVE = "INCONCLUSIVE"
+    NOT_EVALUATED = "NOT_EVALUATED"
 
 class OverallStatus(str, Enum):
     PASS = "PASS"
@@ -30,6 +31,7 @@ class RuleSeverity(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+    INFO = "info"
 
 class TestRunStatus(str, Enum):
     __test__ = False

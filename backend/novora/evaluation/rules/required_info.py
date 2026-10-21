@@ -1,4 +1,5 @@
 import re
+import json
 from typing import Dict, List
 from novora.core.enums import RuleStatus, RuleType
 from novora.core.models import (
@@ -18,6 +19,31 @@ DEFAULT_FIELD_PATTERNS: Dict[str, str] = {
     "zip_code": r"\b\d{5}(?:-\d{4})?\b",
 }
 
+
+def _normalize_required_fields(value: object) -> List[str]:
+    """Read legacy stringified rule parameters without treating JSON as a field name."""
+    normalized: List[str] = []
+    pending = [value]
+    for _ in range(8):
+        if not pending:
+            break
+        item = pending.pop(0)
+        if isinstance(item, str):
+            try:
+                decoded = json.loads(item)
+            except (TypeError, json.JSONDecodeError):
+                normalized.append(item.strip())
+            else:
+                pending.insert(0, decoded)
+        elif isinstance(item, dict):
+            if "required_fields" in item:
+                pending.insert(0, item["required_fields"])
+            elif item.get("field"):
+                pending.append(str(item["field"]))
+        elif isinstance(item, (list, tuple, set)):
+            pending[0:0] = list(item)
+    return [field for field in normalized if field]
+
 class RequiredInfoRule(BaseRule):
     """Rule 1: Verifies whether required customer info was collected."""
 
@@ -31,7 +57,7 @@ class RequiredInfoRule(BaseRule):
         conversation: Conversation,
         scenario: EvaluationScenario,
     ) -> RuleResult:
-        fields_config = config.parameters.get("required_fields", [])
+        fields_config = _normalize_required_fields(config.parameters.get("required_fields", []))
         if not fields_config:
             return RuleResult(
                 rule_id=config.id,
@@ -44,6 +70,16 @@ class RequiredInfoRule(BaseRule):
 
         collected: Dict[str, EvidenceReference] = {}
         missing: List[str] = []
+
+        if not conversation.messages:
+            return RuleResult(
+                rule_id=config.id,
+                rule_name=config.name or "Required Information Verification",
+                rule_type=self.rule_type,
+                status=RuleStatus.INCONCLUSIVE,
+                explanation="No transcript messages are available to verify required information.",
+                evidence=[],
+            )
 
         for field_item in fields_config:
             if isinstance(field_item, dict):

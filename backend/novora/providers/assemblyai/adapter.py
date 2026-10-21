@@ -40,7 +40,9 @@ class AssemblyAIExecutionAdapter:
         config: Dict[str, Any],
         agent_id: Optional[str] = None,
     ) -> List[AgentConfig]:
-        target_id = agent_id or "session_config_default"
+        target_id = agent_id or config.get("agent_id")
+        if not target_id:
+            return []
         return [
             AgentConfig(
                 provider_name="assemblyai",
@@ -60,13 +62,13 @@ class AssemblyAIExecutionAdapter:
         run_id = f"trun_{uuid4().hex[:8]}"
         client = AssemblyAIVoiceAgentClient(
             api_key=config.get("api_key"),
-            system_prompt=agent.system_prompt or "Support assistant",
         )
 
         try:
             result = client.run_agent_session(
+                agent_id=agent.external_agent_id,
                 scripted_turns=test_case.scripted_turns,
-                use_audio_input_mode=True,
+                simulated=config.get("simulated", not bool(config.get("api_key"))),
             )
             return TestRun(
                 id=run_id,

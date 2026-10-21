@@ -40,7 +40,9 @@ class RetellExecutionAdapter:
         config: Dict[str, Any],
         agent_id: Optional[str] = None,
     ) -> List[AgentConfig]:
-        target_id = agent_id or config.get("agent_id") or "agent_retell_default"
+        target_id = agent_id or config.get("agent_id")
+        if not target_id:
+            return []
         return [
             AgentConfig(
                 provider_name="retell",

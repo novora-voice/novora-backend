@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import hashlib
+import json
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -37,6 +39,20 @@ class RuleConfig(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def assign_stable_id_when_missing(cls, value: Any) -> Any:
+        if not isinstance(value, dict) or value.get("id"):
+            return value
+        identity = {
+            key: value.get(key)
+            for key in ("rule_type", "name", "description", "parameters")
+        }
+        encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"), default=str)
+        value = dict(value)
+        value["id"] = f"rule_{hashlib.sha256(encoded.encode('utf-8')).hexdigest()[:12]}"
+        return value
 
 class EvaluationScenario(BaseModel):
     id: str = Field(default_factory=lambda: f"scen_{uuid4().hex[:8]}")
@@ -82,7 +98,13 @@ class RuleResult(BaseModel):
 class EvaluationReport(BaseModel):
     id: str = Field(default_factory=lambda: f"eval_{uuid4().hex[:8]}")
     scenario_id: str
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
     conversation_id: str
+    test_run_id: Optional[str] = None
+    scenario_fingerprint: Optional[str] = None
+    expected_rule_ids: List[str] = Field(default_factory=list)
+    integrity_issues: List[str] = Field(default_factory=list)
     overall_status: OverallStatus
     summary: str
     rule_results: List[RuleResult] = Field(default_factory=list)
@@ -131,11 +153,14 @@ class WebhookEventRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 class RuleComparison(BaseModel):
+    rule_id: Optional[str] = None
+    baseline_rule_id: Optional[str] = None
+    candidate_rule_id: Optional[str] = None
     rule_name: str
     rule_type: RuleType
     baseline_status: RuleStatus
     candidate_status: RuleStatus
-    change: str  # "regressed", "improved", "unchanged"
+    change: str  # "regressed", "improved", "unchanged", "inconclusive", "not_evaluated"
     explanation_diff: str
 
 class RegressionReport(BaseModel):
@@ -144,9 +169,11 @@ class RegressionReport(BaseModel):
     candidate_id: str
     baseline_status: OverallStatus
     candidate_status: OverallStatus
+    comparison_status: OverallStatus = OverallStatus.INCONCLUSIVE
+    coverage_complete: bool = False
+    coverage_issues: List[str] = Field(default_factory=list)
     regression_detected: bool
     net_status_change: str  # "regressed", "improved", "neutral"
     rule_comparisons: List[RuleComparison] = Field(default_factory=list)
     summary: str
     created_at: datetime = Field(default_factory=utc_now)
-
