@@ -53,6 +53,9 @@ Retrieve a scenario definition by ID.
 ### `GET /api/v1/scenarios`
 List registered scenarios with pagination (`limit`, `offset`).
 
+### `PUT /api/v1/scenarios/{scenario_id}`
+Create or replace a scenario with the supplied ID. This supports editing a saved scenario's name, business goal, success criteria, and rules. Existing scenarios retain their original `created_at` timestamp. The response is the saved `EvaluationScenario`.
+
 ---
 
 ## 2. Evaluations & Regression Comparisons

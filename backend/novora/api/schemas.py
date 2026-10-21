@@ -11,6 +11,7 @@ from novora.core.models import (
 )
 
 class CreateRuleConfigRequest(BaseModel):
+    id: Optional[str] = None
     rule_type: str
     name: Optional[str] = None
     description: Optional[str] = None
