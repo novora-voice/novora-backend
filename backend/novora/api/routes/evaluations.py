@@ -21,7 +21,7 @@ def register_evaluation_routes(
 ) -> None:
     @app.post("/api/v1/scenarios", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED, tags=["Scenarios"])
     def create_scenario(req: CreateScenarioRequest) -> ScenarioResponse:
-        rules = [RuleConfig(rule_type=r.rule_type, name=r.name, description=r.description, parameters=r.parameters) for r in req.rules]
+        rules = [RuleConfig(**r.model_dump(exclude_none=True)) for r in req.rules]
         scen = EvaluationScenario(name=req.name, business_goal=req.business_goal, success_criteria=req.success_criteria, rules=rules)
         saved = scenarios.save(scen)
         return ScenarioResponse.model_validate(saved.model_dump())
@@ -32,6 +32,22 @@ def register_evaluation_routes(
         if not scen:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Scenario '{scenario_id}' not found.")
         return ScenarioResponse.model_validate(scen.model_dump())
+
+    @app.put("/api/v1/scenarios/{scenario_id}", response_model=ScenarioResponse, tags=["Scenarios"])
+    def update_scenario(scenario_id: str, req: CreateScenarioRequest) -> ScenarioResponse:
+        existing = scenarios.get(scenario_id)
+        rules = [RuleConfig(**r.model_dump(exclude_none=True)) for r in req.rules]
+        scenario_fields: dict[str, Any] = {
+            "name": req.name,
+            "business_goal": req.business_goal,
+            "success_criteria": req.success_criteria,
+            "rules": rules,
+        }
+        if existing:
+            scenario_fields["created_at"] = existing.created_at
+        scen = EvaluationScenario(id=scenario_id, **scenario_fields)
+        saved = scenarios.save(scen)
+        return ScenarioResponse.model_validate(saved.model_dump())
 
     @app.get("/api/v1/scenarios", response_model=List[ScenarioResponse], tags=["Scenarios"])
     def list_scenarios(limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0)) -> List[ScenarioResponse]:

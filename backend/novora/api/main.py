@@ -27,6 +27,7 @@ from novora.api.routes import (
     test_runs_router,
     tool_endpoints_router,
 )
+from novora.api.routes.configured_agents import router as configured_agents_router
 from novora.api.routes.evaluations import register_evaluation_routes
 from novora.api.routes.test_runs import create_evaluation_worker
 from novora.api.routes.webhooks import register_webhook_routes
@@ -197,6 +198,7 @@ def create_app(
 
     # Modular Routers
     app.include_router(auth_router)
+    app.include_router(configured_agents_router)
     app.include_router(providers_router)
     app.include_router(integrations_router)
     app.include_router(templates_router)
