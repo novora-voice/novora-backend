@@ -188,7 +188,7 @@ def create_app(
         lifespan=lifespan,
     )
 
-     app.add_middleware(
+    app.add_middleware(
         CORSMiddleware,
         allow_origins=["https://novora-voice.github.io/novora-frontend", "http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
         allow_credentials=True,
