@@ -123,4 +123,3 @@ The API health endpoint is /health; its OpenAPI interface is available at /docs 
 ## Repositories
 
 - [Backend source and API documentation](backend/README.md)
-- [Frontend source and dashboard documentation](frontend/README.md)
