@@ -111,6 +111,12 @@ python -m uvicorn novora.api.main:app --app-dir . --reload --port 8000
 
 The API listens locally on http://127.0.0.1:8000. NOVORA_DATABASE_URL must include a SQLAlchemy-compatible PostgreSQL URL, for example a postgresql+psycopg URL. Do not place real secrets in tracked files.
 
+Apply database schema migrations from the `backend` directory after setting `NOVORA_DATABASE_URL`:
+
+```sh
+python -m alembic upgrade head
+```
+
 ### Run tests
 
 ```sh
