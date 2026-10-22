@@ -102,9 +102,13 @@ Phase Two is not part of the current end-to-end product. Until it is implemented
 
 ## Deployment
 
-The backend includes a Dockerfile for a Render Docker Web Service. It binds to 0.0.0.0 and the PORT assigned by Render. Deploy the frontend as a separate Docker Web Service.
+The backend includes a Dockerfile for a Render Docker Web Service. It binds to 0.0.0.0 and the PORT assigned by Render.
 
 The backend also needs a PostgreSQL database and a Redis-compatible Render Key Value service. Configure NOVORA_DATABASE_URL, REDIS_URL, NOVORA_JWT_SECRET, and NOVORA_SECRET_ENCRYPTION_KEY in Render. Configure the frontend's NEXT_PUBLIC_API_URL with the backend's public HTTPS URL before its Docker build. More detail is in [backend/README.md](backend/README.md) and [frontend/README.md](frontend/README.md).
+
+### Production Deployment
+
+Configure and deploy the backend server to https://backend-qg67.onrender.com. Ensure the frontend connects to this production API URL instead of localhost or development endpoints. Verify that all API requests, authentication flows, environment variables, CORS settings, and backend integrations are correctly configured for production. Ensure the backend service is running and accessible before testing the frontend against the deployed environment.
 
 ## Local development
 
