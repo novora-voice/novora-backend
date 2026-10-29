@@ -23,9 +23,11 @@ from novora.evaluation.rules.content_rules import (
 )
 from novora.evaluation.rules.flow_rules import (
     EvidenceAvailabilityRule,
+    LatencyThresholdRule,
     RequiredConfirmationRule,
     RequiredEscalationRule,
     TurnConstraintsRule,
+    WebhookStatusRule,
 )
 from novora.evaluation.rules.tool_rules import (
     ExpectedToolCallRule,
@@ -61,6 +63,8 @@ class EvaluationEngine:
                 RuleType.REQUIRED_CONFIRMATION: RequiredConfirmationRule(),
                 RuleType.TURN_CONSTRAINTS: TurnConstraintsRule(),
                 RuleType.EVIDENCE_AVAILABILITY: EvidenceAvailabilityRule(),
+                RuleType.LATENCY_THRESHOLD: LatencyThresholdRule(),
+                RuleType.WEBHOOK_STATUS: WebhookStatusRule(),
             }
 
 

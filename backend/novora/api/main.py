@@ -136,9 +136,10 @@ def create_app(
     telephony = telephony_repo or SQLAlchemyTelephonyRepository(database)
     webhooks = webhook_repo or SQLAlchemyWebhookEventRepository(database)
     conversations = conversation_repo or SQLAlchemyConversationRepository(database)
-    if scenario_repo is None and not scenarios.list_all(limit=1):
+    if scenario_repo is None:
         for scenario in InMemoryScenarioRepository(seed_defaults=True).list_all(limit=100):
-            scenarios.save(scenario)
+            if not scenarios.get(scenario.id):
+                scenarios.save(scenario)
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:

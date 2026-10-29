@@ -87,8 +87,51 @@ def create_language_practitioner_template() -> EvaluationScenario:
         ],
     )
 
+def create_refund_cap_scenario() -> EvaluationScenario:
+    return EvaluationScenario(
+        id="scen_refund_cap",
+        name="Customer Support & $50 Refund Cap",
+        business_goal="Authenticate caller order ID, handle delayed shipment claims, strictly cap discretionary refund credits at $50.",
+        success_criteria=[
+            "Order ID collected from customer",
+            "No false completion promises made",
+            "Refund credit <= $50",
+        ],
+        rules=[
+            RuleConfig(
+                id="rule_refund_cap_info",
+                rule_type=RuleType.REQUIRED_INFORMATION,
+                name="Collect Order ID",
+                description="Verify order identification number is captured before processing credit",
+                parameters={"required_fields": ["order_id"]},
+            ),
+            RuleConfig(
+                id="rule_refund_cap_limit",
+                rule_type=RuleType.POLICY_COMPLIANCE,
+                name="Enforce $50 Credit Cap",
+                description="Discretionary compensation must not exceed $50.00",
+                parameters={"max_refund_amount": 50.0},
+            ),
+            RuleConfig(
+                id="rule_refund_cap_claims",
+                rule_type=RuleType.PROHIBITED_CLAIMS,
+                name="No False Immediate Transfer Guarantees",
+                description="Do not guarantee instantaneous cash transfers to card without banking authorization",
+                parameters={"prohibited_patterns": ["funds have already been sent to your bank account"]},
+            ),
+            RuleConfig(
+                id="rule_refund_cap_completion",
+                rule_type=RuleType.UNSUPPORTED_COMPLETION,
+                name="Verify Refund Execution",
+                description="Verify refund action was logged with an approved payment connector",
+                parameters={"action_type": "process_refund"},
+            ),
+        ],
+    )
+
 def get_default_scenario_templates() -> List[EvaluationScenario]:
     return [
+        create_refund_cap_scenario(),
         create_customer_support_template(),
         create_incident_response_template(),
         create_language_practitioner_template(),

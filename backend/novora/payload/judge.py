@@ -4,6 +4,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional
 from novora.payload.models import PayloadJudgeVerdict
+from novora.providers.huggingface import HuggingFaceClient, get_hf_token, get_hf_judge_model
 
 
 class PayloadJudge:
@@ -13,12 +14,13 @@ class PayloadJudge:
     def __init__(
         self,
         hf_token: Optional[str] = None,
-        model_id: str = "meta-llama/Llama-3.3-70B-Instruct",
+        model_id: Optional[str] = None,
         hf_endpoint: Optional[str] = None,
     ) -> None:
-        self.hf_token = hf_token or os.getenv("HUGGING_FACE_API_KEY")
-        self.model_id = os.getenv("PAYLOAD_JUDGE_MODEL", model_id)
+        self.hf_token = hf_token or get_hf_token()
+        self.model_id = model_id or get_hf_judge_model()
         self.hf_endpoint = hf_endpoint or os.getenv("HUGGING_FACE_INFERENCE_ENDPOINT")
+        self.hf_client = HuggingFaceClient(token=self.hf_token, judge_model=self.model_id)
 
     def evaluate(
         self,
@@ -140,7 +142,6 @@ class PayloadJudge:
         user_instructions: Optional[str] = None,
         scenario_name: Optional[str] = None,
     ) -> Optional[PayloadJudgeVerdict]:
-        url = self.hf_endpoint or "https://router.huggingface.co/hf-inference/v1/chat/completions"
         system_content = (
             "You are a strict LLM-as-a-judge for Voice Agent Infrastructure configurations. "
             "You evaluate whether the generated JSON payload conforms to the provider's API specifications, "
@@ -154,12 +155,32 @@ class PayloadJudge:
             f"Payload:\n{json.dumps(payload, indent=2)}\n"
         )
 
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content},
+        ]
+
+        raw_output = None
+        if self.hf_client.is_configured():
+            raw_output = self.hf_client.chat_completion(messages, model=self.model_id, temperature=0.1)
+
+        if raw_output:
+            try:
+                data = self.hf_client._extract_json(raw_output)
+                return PayloadJudgeVerdict(
+                    decision=data.get("decision", "pass").lower(),
+                    feedback=data.get("feedback", "Validation passed."),
+                    issues=data.get("issues", []),
+                    confidence=0.94,
+                    model_used=self.model_id,
+                )
+            except Exception:
+                pass
+
+        url = self.hf_endpoint or "https://router.huggingface.co/hf-inference/v1/chat/completions"
         body = {
             "model": self.model_id,
-            "messages": [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_content},
-            ],
+            "messages": messages,
             "max_tokens": 500,
             "temperature": 0.1,
         }

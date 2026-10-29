@@ -4,6 +4,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional
 from novora.payload.models import PayloadGenerationRequest
+from novora.providers.huggingface import HuggingFaceClient, get_hf_token, get_hf_generator_model
 
 
 class PayloadGenerator:
@@ -13,12 +14,13 @@ class PayloadGenerator:
     def __init__(
         self,
         hf_token: Optional[str] = None,
-        model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        model_id: Optional[str] = None,
         hf_endpoint: Optional[str] = None,
     ) -> None:
-        self.hf_token = hf_token or os.getenv("HUGGING_FACE_API_KEY")
-        self.model_id = os.getenv("PAYLOAD_GENERATOR_MODEL", model_id)
+        self.hf_token = hf_token or get_hf_token()
+        self.model_id = model_id or get_hf_generator_model()
         self.hf_endpoint = hf_endpoint or os.getenv("HUGGING_FACE_INFERENCE_ENDPOINT")
+        self.hf_client = HuggingFaceClient(token=self.hf_token, generator_model=self.model_id)
 
     def generate(
         self,
@@ -174,7 +176,6 @@ class PayloadGenerator:
         feedback: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Call Hugging Face Router API for DeepSeek / Llama model generation."""
-        url = self.hf_endpoint or "https://router.huggingface.co/hf-inference/v1/chat/completions"
         system_content = (
             f"You are an expert AI Voice Infrastructure Engineer generating exact API payloads for {request.provider}. "
             "Return ONLY valid JSON matching the provider's exact API schema with no surrounding markdown or explanation."
@@ -188,12 +189,23 @@ class PayloadGenerator:
         if feedback:
             user_content += f"\nPrevious review feedback to fix: {feedback}\n"
 
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content},
+        ]
+
+        if self.hf_client.is_configured():
+            raw_output = self.hf_client.chat_completion(messages, model=self.model_id, temperature=0.2)
+            if raw_output:
+                try:
+                    return self.hf_client._extract_json(raw_output)
+                except Exception:
+                    pass
+
+        url = self.hf_endpoint or "https://router.huggingface.co/hf-inference/v1/chat/completions"
         body = {
             "model": self.model_id,
-            "messages": [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_content},
-            ],
+            "messages": messages,
             "max_tokens": 1000,
             "temperature": 0.2,
         }

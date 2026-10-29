@@ -65,4 +65,6 @@ class RuleType(str, Enum):
     EVIDENCE_AVAILABILITY = "evidence_availability"
     TIMEOUT_EXECUTION_FAILURE = "timeout_execution_failure"
     LLM_SEMANTIC_RUBRIC = "llm_semantic_rubric"
+    LATENCY_THRESHOLD = "latency_threshold"
+    WEBHOOK_STATUS = "webhook_status"
 

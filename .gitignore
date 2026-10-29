@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# Scratch & secret test scripts
+backend/redis_test.py
+
+# Standalone nested git repos
+frontend/
+assemblyai-voice-agent-starter-js/
+
+# IDE
+.vscode/
+.idea/
