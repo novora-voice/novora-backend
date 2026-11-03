@@ -154,3 +154,83 @@ class EvidenceAvailabilityRule(BaseRule):
             status=RuleStatus.PASS,
             explanation=f"Evidence complete with {len(conversation.messages)} message(s).",
         )
+
+class LatencyThresholdRule(BaseRule):
+    """Verifies that average or maximum response latency remains within configured threshold ms."""
+
+    @property
+    def rule_type(self) -> RuleType:
+        return RuleType.LATENCY_THRESHOLD
+
+    def evaluate(
+        self,
+        config: RuleConfig,
+        conversation: Conversation,
+        scenario: EvaluationScenario,
+    ) -> RuleResult:
+        max_allowed_ms = float(config.parameters.get("max_latency_ms", 2500.0))
+        latencies = conversation.metadata.get("latencies_ms", [])
+        if not latencies:
+            return RuleResult(
+                rule_id=config.id,
+                rule_name=config.name or "Latency Threshold Check",
+                rule_type=self.rule_type,
+                status=RuleStatus.PASS,
+                explanation="No latency violations recorded.",
+            )
+        avg_latency = sum(latencies) / len(latencies)
+        if avg_latency > max_allowed_ms:
+            return RuleResult(
+                rule_id=config.id,
+                rule_name=config.name or "Latency Threshold Check",
+                rule_type=self.rule_type,
+                status=RuleStatus.FAIL,
+                explanation=f"Average latency {avg_latency:.1f}ms exceeded limit of {max_allowed_ms:.1f}ms.",
+            )
+        return RuleResult(
+            rule_id=config.id,
+            rule_name=config.name or "Latency Threshold Check",
+            rule_type=self.rule_type,
+            status=RuleStatus.PASS,
+            explanation=f"Latency {avg_latency:.1f}ms within threshold {max_allowed_ms:.1f}ms.",
+        )
+
+class WebhookStatusRule(BaseRule):
+    """Verifies HTTP status or expected response fields for direct webhook contract tests."""
+
+    @property
+    def rule_type(self) -> RuleType:
+        return RuleType.WEBHOOK_STATUS
+
+    def evaluate(
+        self,
+        config: RuleConfig,
+        conversation: Conversation,
+        scenario: EvaluationScenario,
+    ) -> RuleResult:
+        expected_status = int(config.parameters.get("expected_http_status", 200))
+        actual_status = conversation.metadata.get("http_status")
+        if actual_status is None:
+            return RuleResult(
+                rule_id=config.id,
+                rule_name=config.name or "Webhook Status Check",
+                rule_type=self.rule_type,
+                status=RuleStatus.INCONCLUSIVE,
+                explanation="No HTTP response status recorded in conversation metadata.",
+            )
+        if actual_status != expected_status:
+            return RuleResult(
+                rule_id=config.id,
+                rule_name=config.name or "Webhook Status Check",
+                rule_type=self.rule_type,
+                status=RuleStatus.FAIL,
+                explanation=f"Webhook returned HTTP {actual_status}, expected {expected_status}.",
+            )
+        return RuleResult(
+            rule_id=config.id,
+            rule_name=config.name or "Webhook Status Check",
+            rule_type=self.rule_type,
+            status=RuleStatus.PASS,
+            explanation=f"Webhook returned expected HTTP {actual_status}.",
+        )
+

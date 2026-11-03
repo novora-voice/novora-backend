@@ -41,6 +41,23 @@ class CreateScenarioRequest(BaseModel):
     success_criteria: List[str] = Field(default_factory=list)
     rules: List[CreateRuleConfigRequest] = Field(default_factory=list)
 
+class CreateCustomJsonScenarioRequest(BaseModel):
+    name: Optional[str] = None
+    goal: str = Field(min_length=1, description="High level business goal")
+    instructions: List[str] = Field(min_length=1, description="List of plain-English test instructions")
+    expected_behavior: List[str] = Field(default_factory=list, description="Expected agent behaviors")
+    prohibited_behavior: List[str] = Field(default_factory=list, description="Prohibited agent behaviors")
+    rules: List[CreateRuleConfigRequest] = Field(default_factory=list)
+    llm_criteria: List[Dict[str, Any]] = Field(default_factory=list)
+
+class AddLlmCriterionRequest(BaseModel):
+    criterion_id: Optional[str] = None
+    name: str = Field(min_length=1, description="Criterion name")
+    description: str = Field(min_length=1, description="Natural language prompt for LLM judge")
+    expected_behavior: Optional[str] = None
+    failure_conditions: Optional[str] = None
+    guidance: Optional[str] = None
+
 class EvaluateConversationRequest(BaseModel):
     scenario_id: str = Field(description="Target scenario to evaluate against")
     conversation: Conversation = Field(description="Normalized conversation transcript and metadata")

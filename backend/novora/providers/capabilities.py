@@ -40,6 +40,13 @@ class ProviderManifest(BaseModel):
     supports_payload_generation: bool = False
     is_live_verified: bool = False
     documentation_url: Optional[str] = None
+    configuration_requirements: list[str] = Field(default_factory=list)
+    connection_status: str = "disconnected"
+    supported_execution_modes: list[str] = Field(default_factory=list)
+    supported_input_modes: list[str] = Field(default_factory=list)
+    supported_event_types: list[str] = Field(default_factory=list)
+    ghost_caller_implemented: bool = False
+    real_calls_or_paid_operations: bool = False
 
     def supports(self, capability: ProviderCapability) -> bool:
         return capability in self.supported_capabilities
@@ -71,6 +78,12 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         requires_audio_input=False,
         is_live_verified=False,
         documentation_url="https://elevenlabs.io/docs/eleven-agents/api-reference",
+        configuration_requirements=["ELEVENLABS_API_KEY", "agent_id"],
+        supported_execution_modes=["conversation_test", "webhook_contract_test", "offline_mock"],
+        supported_input_modes=["text", "audio"],
+        supported_event_types=["user_transcript", "agent_response", "client_tool_call", "client_tool_result"],
+        ghost_caller_implemented=True,
+        real_calls_or_paid_operations=False,
     ),
     "assemblyai": ProviderManifest(
         provider_name="assemblyai",
@@ -89,6 +102,12 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         requires_audio_input=True,
         is_live_verified=False,
         documentation_url="https://www.assemblyai.com/docs/voice-agents/voice-agent-api",
+        configuration_requirements=["ASSEMBLYAI_API_KEY", "agent_id"],
+        supported_execution_modes=["conversation_test", "webhook_contract_test", "offline_mock"],
+        supported_input_modes=["audio"],
+        supported_event_types=["transcript.user", "transcript.agent", "tool.call", "tool.result"],
+        ghost_caller_implemented=True,
+        real_calls_or_paid_operations=False,
     ),
     "vapi": ProviderManifest(
         provider_name="vapi",
@@ -108,6 +127,12 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supports_payload_generation=True,
         is_live_verified=False,
         documentation_url="https://docs.vapi.ai/",
+        configuration_requirements=["VAPI_API_KEY", "assistant_id"],
+        supported_execution_modes=["webhook_contract_test", "staging_simulation", "offline_mock"],
+        supported_input_modes=["json", "webhook"],
+        supported_event_types=["speech-update", "tool-calls", "tool-result", "status-update"],
+        ghost_caller_implemented=False,
+        real_calls_or_paid_operations=False,
     ),
     "retell": ProviderManifest(
         provider_name="retell",
@@ -126,6 +151,12 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supports_payload_generation=True,
         is_live_verified=False,
         documentation_url="https://docs.retellai.com/",
+        configuration_requirements=["RETELL_API_KEY", "agent_id"],
+        supported_execution_modes=["webhook_contract_test", "web_call_simulation", "offline_mock"],
+        supported_input_modes=["json", "webhook"],
+        supported_event_types=["transcript_utterance", "tool_call_invocation", "tool_response"],
+        ghost_caller_implemented=False,
+        real_calls_or_paid_operations=False,
     ),
     "twilio": ProviderManifest(
         provider_name="twilio",
@@ -140,6 +171,12 @@ PROVIDER_MANIFESTS: Dict[str, ProviderManifest] = {
         supports_ghost_caller=False,
         supports_webhook_contract_test=True,
         is_live_verified=False,
+        configuration_requirements=["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
+        supported_execution_modes=["webhook_contract_test"],
+        supported_input_modes=["form_post"],
+        supported_event_types=["call_status", "recording_status"],
+        ghost_caller_implemented=False,
+        real_calls_or_paid_operations=True,
     ),
 }
 

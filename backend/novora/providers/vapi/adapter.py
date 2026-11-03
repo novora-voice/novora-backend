@@ -112,3 +112,13 @@ class VapiExecutionAdapter:
                 error_message=str(e),
                 completed_at=utc_now(),
             )
+
+    def get_declared_capabilities(self) -> Any:
+        from novora.providers.capabilities import get_provider_manifest
+        return get_provider_manifest(self.provider_name)
+
+    def validate_agent_id(self, agent_id: str) -> bool:
+        return bool(agent_id and isinstance(agent_id, str) and len(agent_id.strip()) > 0)
+
+    def get_supported_execution_modes(self) -> List[str]:
+        return ["webhook_contract_test", "staging_simulation", "offline_mock"]

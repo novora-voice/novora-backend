@@ -47,12 +47,37 @@ class ToolResultRecord(BaseModel):
 
 class NormalizedProviderEvent(BaseModel):
     id: str = Field(default_factory=lambda: f"evt_{uuid4().hex[:8]}")
+    event_id: Optional[str] = None
+    run_id: Optional[str] = None
     provider: str
     event_type: str  # transcript.user, transcript.agent, tool.call, session.ended, etc.
     sequence: int = 0
+    sequence_number: Optional[int] = None
     timestamp: datetime = Field(default_factory=utc_now)
+    occurred_at: Optional[datetime] = None
+    speaker: Optional[str] = None
+    text: Optional[str] = None
+    tool_name: Optional[str] = None
+    tool_arguments: Optional[Dict[str, Any]] = None
+    tool_result: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+    raw_payload_reference: Optional[str] = None
     payload: Dict[str, Any] = Field(default_factory=dict)
     correlation_id: Optional[str] = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.event_id is None:
+            self.event_id = self.id
+        if self.sequence_number is None:
+            self.sequence_number = self.sequence
+        if self.occurred_at is None:
+            self.occurred_at = self.timestamp
+        if self.speaker is None and "role" in self.payload:
+            self.speaker = self.payload.get("role")
+        if self.text is None:
+            self.text = self.payload.get("text") or self.payload.get("content") or self.payload.get("message") or self.payload.get("agent_response")
+        if self.tool_name is None and "tool_name" in self.payload:
+            self.tool_name = self.payload.get("tool_name")
 
 class ScriptedTurn(BaseModel):
     sequence: int

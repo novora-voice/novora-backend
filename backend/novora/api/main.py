@@ -28,6 +28,7 @@ from novora.api.routes import (
     tool_endpoints_router,
 )
 from novora.api.routes.configured_agents import router as configured_agents_router
+from novora.api.routes.voxia import router as voxia_router
 from novora.api.routes.evaluations import register_evaluation_routes
 from novora.api.routes.test_runs import create_evaluation_worker
 from novora.api.routes.webhooks import register_webhook_routes
@@ -136,9 +137,10 @@ def create_app(
     telephony = telephony_repo or SQLAlchemyTelephonyRepository(database)
     webhooks = webhook_repo or SQLAlchemyWebhookEventRepository(database)
     conversations = conversation_repo or SQLAlchemyConversationRepository(database)
-    if scenario_repo is None and not scenarios.list_all(limit=1):
+    if scenario_repo is None:
         for scenario in InMemoryScenarioRepository(seed_defaults=True).list_all(limit=100):
-            scenarios.save(scenario)
+            if not scenarios.get(scenario.id):
+                scenarios.save(scenario)
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
@@ -211,6 +213,7 @@ def create_app(
     app.include_router(tool_endpoints_router)
     app.include_router(batches_router)
     app.include_router(payloads_router)
+    app.include_router(voxia_router)
 
     engine = evaluation_engine or EvaluationEngine()
     app.state.scenario_repository = scenarios

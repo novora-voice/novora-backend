@@ -48,13 +48,25 @@ Create a new evaluation scenario with business goals and deterministic rule defi
 `EvaluationScenario` object with assigned `id` and `created_at`.
 
 ### `GET /api/v1/scenarios/{scenario_id}`
-Retrieve a scenario definition by ID.
+Retrieve a scenario definition by ID. Resolves canonical IDs as well as alias identifiers (e.g., `customer_support_receptionist`, `scen_refund_cap`).
 
 ### `GET /api/v1/scenarios`
 List registered scenarios with pagination (`limit`, `offset`).
 
 ### `PUT /api/v1/scenarios/{scenario_id}`
 Create or replace a scenario with the supplied ID. This supports editing a saved scenario's name, business goal, success criteria, and rules. Existing scenarios retain their original `created_at` timestamp. The response is the saved `EvaluationScenario`.
+
+### `POST /api/v1/scenarios/from-json`
+Create a scenario from custom JSON instructions. Validates required fields (`business_goal`, `instructions`), enforces size limits, and synthesizes policy/deterministic rules.
+
+### `POST /api/v1/scenarios/{scenario_id}/rules`
+Add a user-defined deterministic rule (e.g. `latency_threshold`, `webhook_status`, `prohibited_phrase`, `expected_tool_call`) to an existing scenario.
+
+### `DELETE /api/v1/scenarios/{scenario_id}/rules/{rule_id}`
+Remove a deterministic rule from an existing scenario.
+
+### `POST /api/v1/scenarios/{scenario_id}/llm-criteria`
+Add a user-defined natural language evaluation criterion evaluated by the LLM Judge.
 
 ---
 

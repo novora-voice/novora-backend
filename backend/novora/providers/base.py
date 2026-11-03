@@ -67,3 +67,21 @@ class ExecutableVoiceProvider(Protocol):
     ) -> Any:
         ...
 
+
+class ProviderAdapterContract(ExecutableVoiceProvider, Protocol):
+    """Strict typed contract for all Novora provider adapters (Section 5)."""
+
+    provider_name: str
+
+    def get_declared_capabilities(self) -> Any:
+        """Returns declared ProviderManifest with capabilities and metadata."""
+        ...
+
+    def validate_agent_id(self, agent_id: str) -> bool:
+        """Validate agent ID syntax and presence before execution."""
+        ...
+
+    def get_supported_execution_modes(self) -> list[str]:
+        """Return list of supported execution modes (e.g. conversation_test, webhook_contract_test)."""
+        ...
+

@@ -35,6 +35,8 @@ Scenario (Business Context & Criteria)
 - `turn_constraints`: Minimum or maximum turn count.
 - `policy_compliance`: Multi-turn structured business rule validation.
 - `unsupported_completion`: Agent claiming action without trusted backend confirmation.
+- `latency_threshold`: Validates turn or webhook latency against configured upper bound (in ms).
+- `webhook_status`: Enforces required webhook lifecycle status (e.g., 'completed', 'success').
 
 ### Severities:
 - `CRITICAL`: Immediate overall failure if violated. Never overridden by LLM judge.
