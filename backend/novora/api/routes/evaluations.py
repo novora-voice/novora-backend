@@ -179,6 +179,7 @@ def register_evaluation_routes(
     @app.put("/api/v1/scenarios/{scenario_id}", response_model=ScenarioResponse, tags=["Scenarios"])
     def update_scenario(scenario_id: str, req: CreateScenarioRequest) -> ScenarioResponse:
         existing = scenarios.get(scenario_id) or scenarios.get(SCENARIO_ALIASES.get(scenario_id, ""))
+        existing = scenarios.get(scenario_id)
         rules = [RuleConfig(**r.model_dump(exclude_none=True)) for r in req.rules]
         scenario_fields: dict[str, Any] = {
             "name": req.name,
