@@ -25,6 +25,7 @@ class ConversationSource(str, Enum):
     VAPI_WEBHOOK = "vapi_webhook"
     RETELL_WEBHOOK = "retell_webhook"
     SYNTHETIC_FIXTURE = "synthetic_fixture"
+    VOXIA_SESSION = "voxia_session"
 
 class RuleSeverity(str, Enum):
     CRITICAL = "critical"
