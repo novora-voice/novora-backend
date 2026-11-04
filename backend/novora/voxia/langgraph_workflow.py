@@ -25,6 +25,7 @@ session_id stored in the graph state.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -90,6 +91,14 @@ class VoxiaState(TypedDict):
     content_type: str
     user_text: str
     audio_provided: bool
+
+    # Knowledge Base retrieval context (injected per-turn when KB IDs are configured)
+    knowledge_base_ids: List[str]           # KB IDs authorized for this agent
+    knowledge_org_id: str                   # Org the agent belongs to
+    retrieval_mode: str                     # "vector" | "graph" | "hybrid"
+    retrieval_top_k: int                    # number of chunks to retrieve
+    retrieval_evidence: List[Dict[str, Any]]  # evidence items from KBs (serialised)
+    retrieval_latency_ms: float             # total retrieval time
 
     # Outputs produced during this turn
     agent_text: str
@@ -179,15 +188,126 @@ def _deterministic_response(
 
 
 # ---------------------------------------------------------------------------
+# Knowledge Base Retrieval helper
+# ---------------------------------------------------------------------------
+
+def _retrieve_knowledge(
+    state: VoxiaState,
+) -> tuple[List[Dict[str, Any]], float]:
+    """Retrieve relevant chunks from authorized knowledge bases.
+
+    Returns (evidence_dicts, latency_ms). Never raises — retrieval failures
+    are logged and an empty list is returned so the agent can still answer.
+    """
+    kb_ids: List[str] = state.get("knowledge_base_ids") or []
+    org_id: str = state.get("knowledge_org_id", "")
+    if not kb_ids or not org_id:
+        return [], 0.0
+
+    query = state.get("user_text", "")
+    if not query:
+        return [], 0.0
+
+    try:
+        from novora.adapters.knowledge.retrieval import KnowledgeRetrievalService
+        from novora.api.auth_utils import SessionLocal
+        from novora.persistence.models import DBKnowledgeBase
+
+        retrieval_svc = KnowledgeRetrievalService()
+        retrieval_mode = state.get("retrieval_mode") or "vector"
+        top_k = int(state.get("retrieval_top_k") or 5)
+        t0 = time.time()
+        all_evidence: List[Dict[str, Any]] = []
+
+        db = SessionLocal()
+        try:
+            for kb_id in kb_ids:
+                kb = db.query(DBKnowledgeBase).filter(
+                    DBKnowledgeBase.id == kb_id,
+                    DBKnowledgeBase.org_id == org_id,
+                ).first()
+                if not kb:
+                    logger.warning("KB %s not found or org mismatch — skipping", kb_id)
+                    continue
+                try:
+                    trace = retrieval_svc.retrieve(
+                        kb=kb,
+                        query=query,
+                        org_id=org_id,
+                        retrieval_mode=retrieval_mode,
+                        top_k=top_k,
+                    )
+                    for ev in trace.evidence:
+                        all_evidence.append({
+                            "document_id": ev.document_id,
+                            "chunk_id": ev.chunk_id,
+                            "text": ev.text,
+                            "score": ev.score,
+                            "metadata": ev.metadata,
+                            "source": ev.source,
+                            "knowledge_base_id": kb_id,
+                        })
+                except Exception as kb_exc:
+                    logger.warning("Retrieval from KB %s failed: %s", kb_id, kb_exc)
+        finally:
+            db.close()
+
+        latency_ms = round((time.time() - t0) * 1000.0, 2)
+        # Deduplicate by chunk_id and sort by score descending
+        seen: set = set()
+        deduped = []
+        for ev in sorted(all_evidence, key=lambda x: x["score"], reverse=True):
+            if ev["chunk_id"] not in seen:
+                seen.add(ev["chunk_id"])
+                deduped.append(ev)
+        return deduped[:top_k], latency_ms
+
+    except Exception as exc:
+        logger.warning("Knowledge retrieval failed — continuing without KB context: %s", exc)
+        return [], 0.0
+
+
+def _build_kb_context_preamble(evidence: List[Dict[str, Any]]) -> str:
+    """Format retrieved evidence as a system preamble for the LLM."""
+    if not evidence:
+        return ""
+    lines = ["[KNOWLEDGE BASE CONTEXT — use this information to answer accurately]"]
+    for i, ev in enumerate(evidence, 1):
+        lines.append(f"\n--- Source {i} (score: {ev['score']:.2f}) ---")
+        lines.append(ev["text"])
+    lines.append("\n[END KNOWLEDGE BASE CONTEXT]")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Graph nodes
 # ---------------------------------------------------------------------------
 
 def agent_node(state: VoxiaState) -> Dict[str, Any]:
-    """LLM decision node — calls HF LLM or deterministic test response."""
+    """LLM decision node — calls HF LLM or deterministic test response.
+
+    When knowledge_base_ids are configured in state, retrieves relevant chunks
+    from the authorized knowledge bases and injects them as context before the
+    LLM call. The retrieval evidence is stored in the returned state so the
+    evaluation engine can inspect it.
+    """
     user_text = state["user_text"]
     test_mode = state.get("test_mode", False)
     session_id = state["session_id"]
     events: List[Dict[str, Any]] = list(state.get("events", []))
+
+    # ── Knowledge Base retrieval ──────────────────────────────────────────
+    evidence, retrieval_latency = _retrieve_knowledge(state)
+    kb_preamble = _build_kb_context_preamble(evidence)
+    if evidence:
+        logger.info(
+            "KB retrieval: %d chunks retrieved in %.1fms for session %s",
+            len(evidence), retrieval_latency, session_id,
+        )
+        events.append(_make_event_dict(
+            EventType.BUSINESS_RESULT_RETURNED,
+            {"type": "kb_retrieval", "chunks": len(evidence), "latency_ms": retrieval_latency},
+        ))
 
     # Count user messages already in the conversation to determine turn number
     turn_count = sum(
@@ -206,12 +326,19 @@ def agent_node(state: VoxiaState) -> Dict[str, Any]:
             "audio_bytes": b"",
             "content_type": "audio/wav",
             "tts_error": None,
+            "retrieval_evidence": evidence,
+            "retrieval_latency_ms": retrieval_latency,
             # Append assistant message to the LangGraph conversation
             "messages": [{"role": "assistant", "content": agent_text}],
         }
 
     # Live mode: build history from accumulated messages then call LLM
     history: List[Dict[str, str]] = []
+
+    # Inject KB context as a system message if we have evidence
+    if kb_preamble:
+        history.append({"role": "system", "content": kb_preamble})
+
     for msg in state["messages"]:
         if isinstance(msg, dict):
             history.append({"role": msg["role"], "content": msg["content"]})
@@ -283,6 +410,8 @@ def agent_node(state: VoxiaState) -> Dict[str, Any]:
         "agent_text": content,
         "tool_calls": tool_call_dicts,
         "events": events,
+        "retrieval_evidence": evidence,
+        "retrieval_latency_ms": retrieval_latency,
         "messages": [{"role": "assistant", "content": content}],
     }
 

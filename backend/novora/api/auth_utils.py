@@ -92,6 +92,8 @@ class ConfigurationOrm(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    from novora.persistence.models import Base as PersistenceBase
+    PersistenceBase.metadata.create_all(bind=engine)
 
 def get_db():
     db = SessionLocal()

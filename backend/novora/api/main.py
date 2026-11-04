@@ -29,6 +29,8 @@ from novora.api.routes import (
 )
 from novora.api.routes.configured_agents import router as configured_agents_router
 from novora.api.routes.voxia import router as voxia_router
+from novora.api.routes.organizations import router as organizations_router
+from novora.api.routes.knowledge_bases import router as knowledge_bases_router
 from novora.api.routes.evaluations import register_evaluation_routes
 from novora.api.routes.test_runs import create_evaluation_worker
 from novora.api.routes.webhooks import register_webhook_routes
@@ -214,6 +216,8 @@ def create_app(
     app.include_router(batches_router)
     app.include_router(payloads_router)
     app.include_router(voxia_router)
+    app.include_router(organizations_router)
+    app.include_router(knowledge_bases_router)
 
     engine = evaluation_engine or EvaluationEngine()
     app.state.scenario_repository = scenarios

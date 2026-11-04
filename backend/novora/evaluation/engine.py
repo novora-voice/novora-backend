@@ -35,6 +35,12 @@ from novora.evaluation.rules.tool_rules import (
     ToolArgumentValidationRule,
     ToolCallOrderingRule,
 )
+from novora.evaluation.rules.knowledge_rules import (
+    KnowledgeGroundednessRule,
+    KnowledgeRetrievalSufficiencyRule,
+    KnowledgeSourceCitationRule,
+    KnowledgeTenantAuthorizationRule,
+)
 from novora.evaluation.scenario_identity import fingerprint_scenario
 
 class EvaluationEngine:
@@ -65,6 +71,10 @@ class EvaluationEngine:
                 RuleType.EVIDENCE_AVAILABILITY: EvidenceAvailabilityRule(),
                 RuleType.LATENCY_THRESHOLD: LatencyThresholdRule(),
                 RuleType.WEBHOOK_STATUS: WebhookStatusRule(),
+                RuleType.KNOWLEDGE_RETRIEVAL_SUFFICIENCY: KnowledgeRetrievalSufficiencyRule(),
+                RuleType.KNOWLEDGE_GROUNDEDNESS: KnowledgeGroundednessRule(),
+                RuleType.KNOWLEDGE_SOURCE_CITATION: KnowledgeSourceCitationRule(),
+                RuleType.KNOWLEDGE_TENANT_AUTHORIZATION: KnowledgeTenantAuthorizationRule(),
             }
 
 

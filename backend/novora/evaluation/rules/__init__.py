@@ -25,6 +25,12 @@ from novora.evaluation.rules.flow_rules import (
     TurnConstraintsRule,
     WebhookStatusRule,
 )
+from novora.evaluation.rules.knowledge_rules import (
+    KnowledgeGroundednessRule,
+    KnowledgeRetrievalSufficiencyRule,
+    KnowledgeSourceCitationRule,
+    KnowledgeTenantAuthorizationRule,
+)
 
 __all__ = [
     "BaseRule",
@@ -48,4 +54,8 @@ __all__ = [
     "EvidenceAvailabilityRule",
     "LatencyThresholdRule",
     "WebhookStatusRule",
+    "KnowledgeRetrievalSufficiencyRule",
+    "KnowledgeGroundednessRule",
+    "KnowledgeSourceCitationRule",
+    "KnowledgeTenantAuthorizationRule",
 ]

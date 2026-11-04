@@ -68,4 +68,38 @@ class RuleType(str, Enum):
     LLM_SEMANTIC_RUBRIC = "llm_semantic_rubric"
     LATENCY_THRESHOLD = "latency_threshold"
     WEBHOOK_STATUS = "webhook_status"
+    KNOWLEDGE_RETRIEVAL_SUFFICIENCY = "knowledge_retrieval_sufficiency"
+    KNOWLEDGE_GROUNDEDNESS = "knowledge_groundedness"
+    KNOWLEDGE_SOURCE_CITATION = "knowledge_source_citation"
+    KNOWLEDGE_TENANT_AUTHORIZATION = "knowledge_tenant_authorization"
 
+
+class OrgRole(str, Enum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+    VIEWER = "viewer"
+
+
+class VectorProvider(str, Enum):
+    CHROMA = "chroma"
+    PINECONE = "pinecone"
+    WEAVIATE = "weaviate"
+    QDRANT = "qdrant"
+
+
+class GraphProvider(str, Enum):
+    NEO4J = "neo4j"
+
+
+class RetrievalMode(str, Enum):
+    VECTOR = "vector"
+    GRAPH = "graph"
+    HYBRID = "hybrid"
+
+
+class DocumentStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    INDEXED = "indexed"
+    FAILED = "failed"

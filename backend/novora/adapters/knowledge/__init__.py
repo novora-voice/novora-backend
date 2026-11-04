@@ -7,9 +7,15 @@ from novora.adapters.knowledge.base import (
     VectorSearchRequest,
     VectorStoreConnector,
 )
-from novora.adapters.knowledge.graph import Neo4jConnector
+from novora.adapters.knowledge.graph import Neo4jConnector, create_graph_connector
 from novora.adapters.knowledge.security import validate_destination_endpoint
-from novora.adapters.knowledge.vector import ChromaConnector, PineconeConnector
+from novora.adapters.knowledge.vector import (
+    ChromaConnector,
+    PineconeConnector,
+    QdrantConnector,
+    WeaviateConnector,
+    create_vector_connector,
+)
 
 __all__ = [
     "VectorDocument",
@@ -21,6 +27,10 @@ __all__ = [
     "GraphStoreConnector",
     "PineconeConnector",
     "ChromaConnector",
+    "WeaviateConnector",
+    "QdrantConnector",
+    "create_vector_connector",
     "Neo4jConnector",
+    "create_graph_connector",
     "validate_destination_endpoint",
 ]
