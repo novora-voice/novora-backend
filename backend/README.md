@@ -79,15 +79,24 @@ The API currently includes:
 - Test cases, scripted test runs, batches, and durable evaluation jobs.
 - HTTP tool endpoint configuration and deterministic connectivity/evaluation.
 - ElevenLabs, Twilio, AssemblyAI, Vapi, and Retell webhook ingestion.
+- Voxia text/audio sessions, runtime status and events, speech inference endpoints, and session-to-conversation conversion.
 - Health reporting at /health.
 
-Provider support is capability-specific. ElevenLabs and AssemblyAI have provider session paths; Vapi and Retell include provider-shaped tool or webhook contract testing; Twilio provides telephony status and recording callbacks rather than agent dialogue evaluation. Signed webhook checks, bounded ingestion payloads, transcript-as-data handling, encrypted credentials, and outbound endpoint destination checks protect these integration boundaries. Consult [provider capabilities](docs/provider-capabilities.md) and the [security review](docs/security-review.md) for detail.
+Provider support is capability-specific. Provider manifests describe the supported execution modes, input and event types, configuration needs, and whether a workflow can make real or paid calls. ElevenLabs and AssemblyAI have provider session paths; Vapi and Retell include provider-shaped tool or webhook contract testing; Twilio provides telephony status and recording callbacks rather than agent dialogue evaluation. Signed webhook checks, bounded ingestion payloads, transcript-as-data handling, encrypted credentials, and outbound endpoint destination checks protect these integration boundaries. Consult [provider capabilities](docs/provider-capabilities.md) and the [security review](docs/security-review.md) for detail.
 
 The evaluation engine covers required information and steps, prohibited claims, policy compliance, unsupported completion claims, unresolved work, escalation and confirmation, turn constraints, and tool-call behavior. Persisted evaluation history can be compared between a baseline and candidate run to identify rule-level regressions.
 
+## Voxia managed voice runtime
+
+Voxia adds a managed, multi-turn runtime to the existing provider evaluation platform. The `/api/v1/voxia` API supports session creation and status, text or recorded-audio turns, session events, speech-to-text and text-to-speech, and ending a session. Audio turns use the Pipecat pipeline; both audio and text turns are handled by a stateful LangGraph workflow. The runtime can execute its authorized business tools and records tool requests, results, and errors as events.
+
+Voxia uses remote Hugging Face Inference Providers for STT, LLM, and TTS; it does not load models locally. Configure `HF_TOKEN` (or `HUGGING_FACE_API_KEY`) on the backend, with optional model/provider overrides `HF_STT_MODEL`, `HF_STT_PROVIDER`, `HF_LLM_MODEL`, `HF_LLM_PROVIDER`, `HF_TTS_MODEL`, and `HF_TTS_PROVIDER`. Keep the token in the backend secret manager, never in a `NEXT_PUBLIC_*` variable. Inference availability, provider support, and pricing depend on the selected Hugging Face models and providers.
+
+Active Voxia session state is currently in memory, so a backend restart loses active sessions and separate backend instances do not share them. Ending a session attempts to save it as a Novora conversation, which can then be evaluated using the existing scenario and evidence pipeline.
+
 ## Phase Two roadmap
 
-The Knowledge Base page is planned work. Phase Two is expected to add authorized read-only knowledge sources, retrieval-grounded evaluation, and source/version references in reports. The frontend also labels the following capabilities as planned: a managed Voxia voice runtime, stateful LangGraph workflows, and organization-level access controls/RBAC. These capabilities are not part of the current end-to-end product, and no release date is committed. In particular, the vector and graph connector prototypes are in-memory and are not production knowledge integrations.
+The Knowledge Base page is planned work. Phase Two is expected to add authorized read-only knowledge sources, retrieval-grounded evaluation, and source/version references in reports. Organization-level access controls/RBAC are also planned. These capabilities are not part of the current end-to-end product, and no release date is committed. In particular, the vector and graph connector prototypes are in-memory and are not production knowledge integrations.
 
 OpenAPI documentation is served at /docs while the API is running.
 
@@ -101,6 +110,7 @@ Requirements: Python 3.10 or newer, PostgreSQL, and Redis. For the dashboard, in
    - REDIS_URL
    - NOVORA_JWT_SECRET
    - NOVORA_SECRET_ENCRYPTION_KEY
+   - HF_TOKEN (optional; required for live Voxia or Hugging Face inference)
 3. Install backend dependencies and start the API:
 
 ```sh
