@@ -1,378 +1,734 @@
-# Implementation Prompt: Voxia — Remote-Inference Browser Voice Runtime Powered by Hugging Face
+# Novora Implementation: Production Knowledge Base, Hybrid RAG, Graph RAG, and Organization-Level RBAC
 
 ## Role
 
-Act as a senior AI systems engineer specializing in Python, Pipecat, LangGraph, Hugging Face Inference Providers, real-time voice applications, and production-grade agent runtimes.
+Act as a senior backend and AI infrastructure engineer specializing in RAG systems, hybrid retrieval, Graph RAG, vector databases, graph databases, multi-tenant SaaS architecture, FastAPI, PostgreSQL, and secure integrations.
 
-Implement Voxia, my own stateful voice-agent runtime, integrated with my existing Novora evaluation platform.
+Your task is to implement the production Knowledge Base functionality and organization-level access controls in my existing Novora platform.
 
-**Critical architectural requirement: All STT, LLM, and TTS model inference must happen remotely through Hugging Face Inference Providers. Do not run AI models locally.**
+This is an implementation task. Inspect the existing repositories, understand the existing architecture and connector prototypes, and implement the features without breaking the current platform.
 
-My budget is zero. Use Hugging Face's available free credits or eligible free usage where available, and make usage visible and configurable. Never silently switch to a paid provider or assume unlimited free inference.
+## 1. Product objective
 
-This is an implementation task. Inspect the repositories, plan the changes, and then implement and test a working end-to-end system.
+Novora must allow organizations to connect their own knowledge infrastructure, ingest and manage documents, retrieve relevant knowledge, connect that knowledge to agents, and evaluate whether agents use that knowledge correctly.
 
-## 1. Required architecture
+**Important architectural decision: Customers own their knowledge databases. Novora provides the integration and retrieval infrastructure.**
 
-Implement this flow:
+Do not force customers to use a Novora-owned vector database.
 
-Browser microphone → Pipecat → Voxia backend → Hugging Face Inference Providers for STT → LangGraph workflow using a remote LLM → authorized tools → Hugging Face Inference Providers for TTS → browser audio playback → Novora evaluation.
+Support both:
 
-Responsibilities:
+- Customer-managed vector databases.
+- Customer-managed graph databases.
 
-- **Browser:** microphone capture, session controls, transcripts, conversation history, and audio playback.
-- **Pipecat:** audio transport, buffering, turn handling, and voice pipeline orchestration.
-- **Voxia:** session lifecycle, agent configuration, policies, tool execution, runtime events, and integration boundaries.
-- **Hugging Face Inference Providers:** remote STT, LLM inference, and TTS.
-- **LangGraph:** stateful business workflow, tool decisions, clarification, continuation, and completion.
-- **Novora:** test scenarios, evaluation, evidence, reports, and outcome verification.
+Novora should provide a provider-neutral integration layer so customers can change database providers without rewriting agent workflows.
 
-Keep these responsibilities separate. Do not invoke LangGraph for every audio frame; invoke it for completed utterances or meaningful events.
+Implement organization-level access control as part of this work so knowledge bases, documents, connections, and agents are isolated and accessible only to authorized organization members.
 
-## 2. Inspect the repositories before coding
+## 2. Repository audit and safety
 
-Before changing files:
+Before implementation:
 
-1. Identify the actual Novora backend, frontend, and any existing Voxia repository.
-2. Inspect Git branches, working-tree status, uncommitted changes, project structure, dependencies, API routes, authentication, database models, evaluation engine, and existing provider integrations.
-3. Determine whether an appropriate Voxia branch already exists.
-4. Preserve all user changes and existing functionality.
-5. Do not reset, clean, overwrite, or discard user work.
-6. Do not merge into the main branch or deploy automatically.
-7. Establish the smallest safe implementation plan based on the actual codebase.
+1. Inspect the existing backend and frontend repositories.
+2. Inspect current Git branches and working-tree changes.
+3. Locate the existing Knowledge Base page, connector prototypes, database models, authentication, agent configuration, scenario/evaluation engine, and API contracts.
+4. Identify existing organization, user, workspace, and membership models.
+5. Identify existing document storage and file-upload mechanisms, if any.
+6. Inspect existing migrations and testing conventions.
+7. Document what already works and what is missing.
 
-If repositories are unavailable, clearly identify which integrations cannot be verified. Do not invent their routes, models, or contracts.
+Preserve existing user changes.
 
-After the initial audit, continue with implementation instead of stopping at a proposal.
+Do not reset, discard, overwrite, or replace existing code unnecessarily.
 
-## 3. Hugging Face remote inference layer
+Do not redesign unrelated frontend pages. Preserve the existing Novora branding, design system, navigation, components, and layouts. Extend the existing Knowledge Base UI.
 
-Use the official Hugging Face `InferenceClient` or `AsyncInferenceClient` from `huggingface_hub`, or another official compatible client if justified by the repository.
+Use the existing feature branch if appropriate. Otherwise, create a safe feature branch without losing uncommitted work.
 
-Use Hugging Face's routed Inference Providers for remote model execution. Do not deploy dedicated inference endpoints or provision separate GPU infrastructure.
+Do not merge or deploy automatically.
 
-Keep model selection configurable through environment variables.
+After the audit, implement the functionality instead of stopping at a proposal.
 
-Suggested configuration:
+## 3. Customer-owned knowledge infrastructure
 
-- `HF_TOKEN`
-- `HF_STT_MODEL`
-- `HF_STT_PROVIDER`, if supported by the selected model and client
-- `HF_LLM_MODEL`
-- `HF_LLM_PROVIDER`, if supported
-- `HF_TTS_MODEL`
-- `HF_TTS_PROVIDER`, if supported
-- Request timeouts and maximum audio duration
-- Optional maximum response length and usage limits
+Support the following vector database providers:
 
-Use the actual configuration conventions already present in the repositories where appropriate.
+- Chroma
+- Pinecone
+- Weaviate
+- Qdrant
 
-### Security
+Support graph database connectivity:
 
-- Keep `HF_TOKEN` exclusively on the backend.
-- Never expose it through frontend environment variables, API responses, browser code, or client-side logs.
-- Add the token to `.env.example` as an empty placeholder.
-- Never commit secrets.
-- Validate uploaded audio, text inputs, and model parameters.
-- Apply reasonable request-size limits, timeouts, and concurrency limits.
+- Neo4j
+- An extensible provider interface for additional graph databases.
 
-### Provider and model compatibility
+Do not assume every provider has identical capabilities.
 
-Do not assume every Hugging Face model works with every Inference Provider.
+Create separate provider-neutral interfaces for vector and graph operations.
 
-Before selecting a model, verify that the selected model and provider support the required task and that the current client API supports the intended request.
+Suggested interfaces:
 
-Use Hugging Face's current task-specific documentation:
+Vector database:
+- connect()
+- validate_connection()
+- create_or_validate_collection()
+- upsert_documents()
+- delete_documents()
+- search()
+- get_collection_metadata()
+- health_check()
 
-- Inference Providers: https://huggingface.co/docs/inference-providers
-- InferenceClient reference: https://huggingface.co/docs/huggingface_hub/package_reference/inference_client
+Graph database:
+- connect()
+- validate_connection()
+- create_or_validate_schema()
+- query()
+- retrieve_related_entities()
+- health_check()
 
-Implement each model adapter against verified APIs. Do not fabricate model IDs, provider names, parameters, or capabilities.
+Adapt these interfaces to the actual capabilities of each provider.
 
-## 4. Remote speech-to-text
+Implement individual adapters rather than placing provider-specific conditionals throughout the application.
 
-Use a Hugging Face Inference Provider that supports automatic speech recognition for the selected model.
+The runtime should use the same retrieval interface regardless of which provider the customer selects.
 
-Requirements:
+### Customer connection configuration
 
-- Accept browser-recorded audio through the backend.
-- Validate supported MIME types, codecs, file sizes, and durations.
-- Normalize audio only when required by the chosen provider's verified interface.
-- Send the audio to remote Hugging Face inference.
-- Return the transcription, language information when available, and processing metadata.
-- Handle unsupported audio, empty audio, provider errors, rate limits, timeouts, and temporary unavailability.
-- Avoid retaining raw audio unless necessary and explicitly configured.
-- Record latency and model/provider identifiers for debugging and evaluation.
+Customers must be able to configure:
 
-Do not load Whisper, Transformers, faster-whisper, or another STT model into the local application process.
+- Provider.
+- Connection endpoint or approved connection mechanism.
+- Authentication credentials.
+- Collection or index name.
+- Namespace where supported.
+- Relevant provider-specific settings.
+- Organization ownership.
+- Knowledge base association.
 
-## 5. Remote LLM for LangGraph
+Do not expose credentials to the frontend after initial submission.
 
-Use a remote chat-completion model accessible through Hugging Face Inference Providers.
+Encrypt stored credentials using the existing Novora encryption architecture. Never store plaintext secrets.
 
-Requirements:
+Use secure secret handling, connection validation, endpoint restrictions, and appropriate network access controls.
 
-- Configure the model through environment variables.
-- Use structured outputs or validated tool-call formats where supported.
-- Maintain conversation state through LangGraph.
-- Separate model reasoning from tool execution.
-- Validate tool arguments before execution.
-- Do not trust the model to authorize its own tool calls.
-- Handle model timeouts, malformed outputs, unavailable providers, and rate limits.
-- Keep the workflow's business logic independent from the specific LLM provider.
+Do not accept arbitrary unrestricted URLs or implement unsafe server-side fetching.
 
-A deterministic test mode may use fixed responses and predictable tool decisions for automated tests. It must be explicitly identified as test mode and must not be presented as live model inference.
+External database connections should use read-only credentials by default unless a particular operation genuinely requires write access.
 
-Do not run an LLM locally or silently fall back to a local model.
+For customer-owned vector databases, document the minimum permissions needed for document indexing and retrieval.
 
-## 6. Remote text-to-speech
+## 4. Knowledge Base management
 
-Use a Hugging Face Inference Provider that supports text-to-speech for the selected model.
+Implement complete Knowledge Base CRUD functionality.
 
-Requirements:
+An organization should be able to:
 
-- Receive the agent's final response text.
-- Send it to the remote TTS inference service.
-- Return generated audio to the browser in a supported format.
-- Handle content types and audio encodings correctly.
-- Record model/provider identifiers and generation latency.
-- Handle provider errors, timeouts, empty responses, and rate limits.
-- Keep the TTS adapter replaceable without changing the business workflow.
+- Create a knowledge base.
+- Give it a name and description.
+- Select a vector database connection.
+- Optionally connect a graph database.
+- Configure the collection or namespace.
+- View connection status.
+- Test database connectivity.
+- Edit configuration.
+- Associate the knowledge base with agents.
+- View its documents and ingestion history.
+- Delete or archive it safely.
 
-Do not download or load Kokoro, Transformers, or other TTS model weights locally.
+A knowledge base belongs to an organization.
 
-If the chosen STT, LLM, or TTS provider becomes unavailable, return a clear error and preserve recoverable session state. Never silently switch to paid services or local model execution.
+An agent must not be able to access a knowledge base belonging to another organization.
 
-## 7. Browser voice interface
+Support multiple knowledge bases per organization and the ability to associate an agent with one or more authorized knowledge bases.
 
-Integrate the voice experience into the existing frontend and preserve the current design system.
+Do not assume every agent needs graph retrieval.
 
-Do not redesign unrelated Novora pages or remove existing functionality.
+Allow customers to configure vector-only, graph-only where supported, or hybrid retrieval.
+
+## 5. Document ingestion pipeline
+
+Implement production-oriented document ingestion.
+
+Support practical document formats such as:
+
+- PDF.
+- DOCX.
+- TXT.
+- Markdown.
+- CSV, where a suitable ingestion strategy exists.
+
+Inspect existing dependencies before adding new document-processing libraries.
+
+### Ingestion workflow
+
+Implement the following pipeline:
+
+1. User uploads a document.
+2. Validate organization permissions.
+3. Validate file type, size, and content.
+4. Persist the document metadata.
+5. Extract text.
+6. Normalize extracted text.
+7. Extract useful metadata.
+8. Split the content into configurable chunks.
+9. Generate embeddings.
+10. Upsert chunks into the customer's selected vector database.
+11. Optionally process structured entities and relationships for graph indexing.
+12. Update ingestion status.
+13. Record errors and ingestion history.
+
+Use background jobs for long-running ingestion tasks where the existing ARQ infrastructure is suitable.
+
+Do not perform long document ingestion inside an ordinary synchronous HTTP request.
+
+### Document metadata
+
+Persist relevant information:
+
+- Document ID.
+- Organization ID.
+- Knowledge base ID.
+- Original filename.
+- MIME type.
+- File size.
+- Content hash.
+- Storage reference.
+- Ingestion status.
+- Chunk count.
+- Embedding model identifier.
+- Vector provider and collection.
+- Uploading user.
+- Created and updated timestamps.
+- Error details where applicable.
+
+Support duplicate detection through content hashes.
+
+Implement safe document replacement, re-indexing, and deletion.
+
+When deleting or replacing a document, ensure its corresponding indexed chunks are also handled correctly.
+
+Use idempotent job handling where possible.
+
+### Storage
+
+Inspect existing storage infrastructure.
+
+If there is an existing file-storage mechanism, reuse it.
+
+Otherwise, implement a storage abstraction that supports local development and can later use compatible object storage.
+
+Do not assume a paid cloud storage service is available.
+
+Do not store large documents or binary files directly in PostgreSQL unless the existing architecture has a deliberate reason to do so.
+
+## 6. Embedding infrastructure
+
+Implement an embedding abstraction independent of vector database providers.
+
+The embedding generation process must support remote inference through an appropriate configurable provider.
+
+If Hugging Face Inference Providers are used, verify that the chosen model and provider support the required embedding task.
+
+Do not run local embedding models or silently switch to a paid service.
+
+Make embedding configuration explicit.
+
+Persist the embedding model identifier and relevant indexing configuration with the knowledge base or index metadata.
+
+**Important:** Documents indexed with one embedding model cannot safely be queried with an incompatible embedding model.
+
+Implement validation that prevents incompatible query embeddings from being used against an existing index.
+
+If the customer supplies a pre-indexed external knowledge base, support retrieval from it where compatible without requiring Novora to re-ingest all its documents.
+
+Do not assume that every external database contains embeddings generated by the same model.
+
+## 7. Retrieval engine
+
+Implement a provider-neutral retrieval service.
+
+A query should include:
+
+- Organization ID.
+- Agent ID.
+- Knowledge base IDs.
+- User question.
+- Retrieval configuration.
+- Optional metadata filters.
+- Optional graph retrieval configuration.
+
+### Vector retrieval
+
+Support:
+
+- Similarity search.
+- Configurable top-k.
+- Metadata filtering.
+- Namespace or collection selection.
+- Relevance scores where supported.
+- Source document and chunk identifiers.
+- Retrieval latency.
+
+### Graph retrieval
+
+Where a graph database is configured, support:
+
+- Entity retrieval.
+- Related entity lookup.
+- Relationship traversal.
+- Relevant context retrieval.
+- Safe, parameterized queries.
+- Query restrictions.
+
+Never execute arbitrary graph queries supplied directly by an end user or untrusted LLM without validation and authorization.
+
+### Hybrid retrieval
+
+Combine vector and graph retrieval when both are configured.
+
+The system should:
+
+1. Retrieve semantically relevant chunks.
+2. Identify useful entities and relationships.
+3. Retrieve related graph context.
+4. Merge and deduplicate evidence.
+5. Rank or rerank results where supported.
+6. Return a structured evidence package.
+
+Keep vector-only retrieval fully functional when graph infrastructure is absent.
+
+Do not force graph database setup on customers who only want vector RAG.
+
+### Retrieval result
+
+Return a structured result containing:
+
+- Query.
+- Knowledge base IDs.
+- Source document IDs.
+- Chunk IDs.
+- Retrieved text.
+- Provider and collection.
+- Similarity/relevance scores where available.
+- Graph entities and relationships where applicable.
+- Retrieval latency.
+- Retrieval errors or partial-result indicators.
+
+Do not fabricate sources, similarity scores, or graph relationships.
+
+## 8. Agent integration
+
+Knowledge bases must be configurable on existing Novora agents.
+
+Extend the existing agent configuration rather than introducing a completely separate agent system.
+
+Allow authorized users to:
+
+- Attach one or more knowledge bases to an agent.
+- Select retrieval mode.
+- Configure top-k.
+- Configure metadata filters.
+- Enable or disable graph retrieval.
+- Configure retrieval thresholds where supported.
+- Inspect the knowledge bases available to an agent.
+
+At runtime:
+
+1. Agent receives a user request.
+2. Runtime identifies the agent's authorized knowledge bases.
+3. Retrieval executes with organization and permission filters.
+4. Retrieved evidence is added to the agent's context.
+5. The LLM generates an answer grounded in that evidence.
+6. Sources are retained in the execution trace.
+
+The agent should distinguish between:
+
+- Information supported by retrieved evidence.
+- Information not found in the knowledge base.
+- Conflicting sources.
+- Retrieval failures.
+
+If relevant information is unavailable, the agent must be able to say it does not have sufficient information rather than inventing an answer.
+
+Avoid injecting an entire knowledge base into the LLM context. Retrieve only relevant evidence.
+
+Preserve the existing Novora provider agent workflows.
+
+For external agents, support knowledge retrieval through the existing integration mechanisms where possible. For Novora's own runtime, provide a native retrieval tool/interface.
+
+## 9. Knowledge-grounded evaluations
+
+This is a critical Novora differentiator.
+
+Extend the existing evaluation engine to support knowledge-grounded evaluation.
+
+Do not create an unrelated second evaluation engine.
+
+Capture retrieval evidence alongside conversation and tool execution evidence.
+
+Add evaluation capabilities such as:
+
+### Retrieval evaluation
+
+- Was relevant information retrieved?
+- Were the correct source documents retrieved?
+- Were relevant chunks missing?
+- Was the retrieval context sufficient?
+- Did retrieval return irrelevant information?
+
+### Groundedness evaluation
+
+- Is the response supported by retrieved evidence?
+- Did the agent invent information?
+- Did the agent contradict the source material?
+- Did it ignore relevant evidence?
+- Did it acknowledge missing information?
+
+### Source evaluation
+
+- Can the answer be traced to its source documents?
+- Are the cited sources associated with the correct organization?
+- Were source permissions respected?
+- Was the correct knowledge base used?
+
+### Deterministic checks
+
+Where appropriate, implement deterministic rules for:
+
+- Required source presence.
+- Required metadata.
+- Allowed knowledge base IDs.
+- Prohibited source usage.
+- Missing retrieval evidence.
+- Unauthorized knowledge access.
+
+LLM-based judges may evaluate semantic groundedness, but deterministic security and evidence failures must not be overridden by positive LLM judgments.
+
+A missing retrieval trace must not be interpreted as a successful grounded answer.
+
+Store the evaluation evidence so users can inspect why an agent passed or failed.
+
+## 10. Organization-level RBAC
+
+Implement proper organization-level access control.
+
+First inspect whether the existing database already supports organizations, workspaces, memberships, or roles.
+
+Reuse existing structures where possible. Avoid introducing duplicate tenant models.
+
+At minimum, support these roles:
+
+- Owner.
+- Admin.
+- Member.
+- Viewer.
+
+Define and enforce permissions for:
+
+**Owner**
+- Full organization access.
+- Manage organization settings.
+- Invite and remove members.
+- Assign roles.
+- Manage integrations, knowledge bases, and agents.
+- Access organization resources.
+
+**Admin**
+- Manage organization members according to the defined policy.
+- Manage agents, integrations, and knowledge bases.
+- Manage scenarios and evaluations.
+- Cannot transfer ownership or perform owner-only actions.
+
+**Member**
+- Access authorized organization resources.
+- Create and manage permitted agents, knowledge bases, scenarios, and evaluations.
+- Cannot change organization-level security settings or assign privileged roles.
+
+**Viewer**
+- Read-only access to permitted resources.
+- Cannot create, edit, delete, or execute privileged operations.
+
+Implement a centralized permission-checking mechanism.
+
+Do not rely on frontend visibility as authorization.
+
+Every protected backend operation must verify:
+
+1. Authenticated user.
+2. Organization membership.
+3. Role permissions.
+4. Resource ownership.
+5. Resource-to-organization relationship.
+
+Apply tenant isolation to:
+
+- Knowledge bases.
+- Documents.
+- Database connections.
+- Agents.
+- Scenarios.
+- Evaluation runs.
+- Reports.
+- Retrieval requests.
+- Session evidence.
+
+Prevent IDOR vulnerabilities and cross-organization resource access.
+
+Ensure background jobs preserve organization context and revalidate resource ownership before processing.
+
+Implement migrations using the existing migration system.
+
+If the current schema lacks organizations and memberships, add them safely with a migration strategy that preserves existing user data and handles existing resources.
+
+## 11. Frontend implementation
+
+Extend the existing Knowledge Base page.
+
+Preserve Novora's existing design, branding, navigation, components, and overall layout.
+
+Do not redesign the application.
+
+Implement the following views and workflows:
+
+### Knowledge Base overview
+
+Display:
+
+- Knowledge base name.
+- Description.
+- Organization.
+- Vector provider.
+- Graph provider, if configured.
+- Connection status.
+- Number of documents.
+- Ingestion status.
+- Last updated.
+
+### Create Knowledge Base
+
+Allow a user to:
+
+1. Enter the name and description.
+2. Select a vector provider.
+3. Configure its connection.
+4. Validate the connection.
+5. Optionally configure a graph provider.
+6. Validate the graph connection.
+7. Create the knowledge base.
+
+Clearly explain that customers provide and own their database infrastructure.
+
+Do not display fake successful connections.
+
+### Document management
+
+Allow authorized users to:
+
+- Upload supported files.
+- View documents.
+- View processing status.
+- View ingestion errors.
+- Re-index documents.
+- Delete documents.
+- Inspect ingestion history.
+
+Provide meaningful loading, empty, error, and success states.
+
+### Agent configuration
+
+Allow users to attach knowledge bases to agents and configure retrieval behavior.
+
+Show which knowledge sources an agent can access.
+
+### Organization settings
+
+Provide member management and role assignment based on permissions.
+
+Do not show administrative actions to users who do not have permission, but always enforce permissions in the backend.
+
+Use the existing component library and patterns.
+
+Do not introduce mock data as if it were real production state.
+
+## 12. API design
+
+Inspect existing routes before defining new ones.
+
+Implement consistent API contracts for:
+
+- Organization membership and roles.
+- Knowledge base creation, update, deletion, and listing.
+- Vector and graph connection validation.
+- Document upload and management.
+- Ingestion status and history.
+- Agent-to-knowledge-base associations.
+- Retrieval testing.
+- Retrieval evidence.
+- Knowledge-grounded evaluation.
+
+Use the existing FastAPI conventions, authentication, response models, and error handling.
+
+Document all newly introduced endpoints.
+
+Do not invent endpoint names in the frontend without implementing the corresponding backend contracts.
+
+## 13. Security requirements
+
+Treat customer knowledge and database credentials as sensitive.
 
 Implement:
 
-- Start and end session controls.
-- Browser microphone permission handling.
-- Microphone capture.
-- Audio transport compatible with the selected Pipecat setup.
-- Display of recognized speech.
-- Display of agent responses.
-- Audio playback.
-- Conversation history.
-- Session and connection status.
-- Clear loading, error, retry, and disconnected states.
+- Encrypted credential storage.
+- Organization-level isolation.
+- Permission-aware retrieval.
+- Safe file validation.
+- Upload size restrictions.
+- SSRF protection.
+- Connection timeouts.
+- Safe database query execution.
+- Read-only database credentials by default.
+- Secret redaction in logs.
+- Safe deletion and re-indexing.
+- Background-job authorization.
+- Audit logging for sensitive operations.
 
-Prefer WebRTC when supported by the chosen Pipecat version and practical for the existing environment. Verify the actual transport APIs before implementation.
+Do not allow one organization to query, retrieve, modify, or inspect another organization's documents or database connections.
 
-If a simpler supported transport is needed for the first working version, document the trade-off and keep the transport boundary replaceable.
+## 14. Testing
 
-The frontend must communicate with Voxia through the backend. Never call Hugging Face directly from the browser using a private token.
-
-## 8. Voxia runtime and LangGraph workflow
-
-Implement a modular, stateful agent runtime.
-
-Track the session ID, agent ID, conversation turns, workflow state, tool calls, tool results, timestamps, and session status.
-
-Support the following workflow:
-
-1. Receive a completed user utterance.
-2. Retrieve the relevant session state.
-3. Decide whether to answer, ask a clarifying question, execute an authorized tool, or finish.
-4. Execute an approved tool when appropriate.
-5. incorporate the actual tool result into the workflow.
-6. Generate the final response using the configured remote LLM.
-7. Send the response to remote TTS.
-8. Return playable audio and conversation events to the browser.
-9. Persist the updated state and evidence.
-
-Use supported LangGraph checkpointing and the existing persistence architecture where appropriate.
-
-Handle disconnected clients separately from graph checkpointing: a persisted workflow state does not automatically restore a WebRTC or audio session.
-
-Do not persist large audio payloads in graph state.
-
-## 9. Working demonstration
-
-Implement one complete customer-support workflow with mock business data.
-
-The agent should be able to:
-
-- Greet a customer.
-- Understand the customer's request.
-- Ask for an order reference.
-- Invoke a mock order-lookup tool.
-- Return the actual result from the mock dataset.
-- Ask a follow-up question.
-- End the conversation appropriately.
-
-Use a small, clearly identified fixture dataset. Do not connect to real customer accounts or invent external results.
-
-Demonstrate multiple turns and retained state.
-
-The agent must never claim an action succeeded merely because it requested the action. Record whether the tool actually executed and what it returned.
-
-Keep tool interfaces extensible for future business integrations.
-
-## 10. Novora integration
-
-Inspect Novora's existing API contracts and evaluation pipeline before implementing integration.
-
-Voxia is the runtime under test; Novora remains the evaluation and reporting platform.
-
-Preserve existing provider integrations and the current evaluation engine.
-
-Where supported by existing APIs, associate runtime sessions with a Novora scenario and evaluation run. Submit or expose actual runtime evidence through the existing integration patterns.
-
-Capture relevant events, including:
-
-- Session started and completed.
-- User utterance transcribed.
-- Agent response generated.
-- Tool requested.
-- Tool execution succeeded or failed.
-- Business result returned.
-- Runtime error or interruption.
-
-Distinguish clearly between attempted actions, completed tool execution, and verified business outcomes.
-
-Do not invent backend endpoints. If the existing API lacks a required contract, implement a small integration interface and document the missing piece. Make cross-repository changes only when necessary and backward-compatible.
-
-A deterministic rule failure must not be overridden by a positive LLM judgment. Missing evidence must not count as success.
-
-## 11. Zero-budget operation
-
-The architecture must not require:
-
-- Local AI model execution.
-- Paid telephony.
-- Paid STT/TTS/LLM subscriptions.
-- Dedicated Hugging Face Inference Endpoints.
-- Paid hosting.
-- A paid managed database.
-
-Use Hugging Face's routed Inference Providers and the account's available credits or free usage.
-
-Important: free inference credits are limited and can change. The system must not assume unlimited free requests.
-
-Implement:
-
-- Configurable request limits.
-- Maximum audio duration and response length.
-- Concurrency limits.
-- Reasonable timeouts.
-- Usage and latency logging.
-- Clear errors when quota or credits are exhausted.
-- A documented way to inspect usage and billing.
-
-Do not automatically purchase credits, enable paid services, or switch to a billing-enabled provider without explicit authorization.
-
-Automated tests must not make paid inference requests by default.
-
-## 12. Testing
-
-Implement automated tests using the existing project test frameworks.
+Add tests using the existing test framework.
 
 ### Unit tests
 
 Test:
 
-- STT adapter request and response handling.
-- LLM adapter response parsing.
-- TTS adapter response handling.
-- LangGraph state transitions.
-- Tool authorization and argument validation.
-- Session persistence.
-- Provider failures and timeouts.
+- Each vector adapter.
+- Graph adapter interfaces.
+- Connection validation.
+- Document parsing.
+- Chunking.
+- Embedding interface.
+- Retrieval.
+- Hybrid retrieval.
+- Permission checking.
+- Role authorization.
+- Tenant isolation.
+- Document deletion and re-indexing.
+- Groundedness evaluation.
 - Error handling.
-- Session isolation.
-- Evidence generation.
 
-Mock the remote inference client in unit tests. Do not require real inference credits to run the default test suite.
+Mock external providers by default. Automated tests must not require paid database services or inference requests.
 
 ### Integration tests
 
-Use mocked inference adapters to verify:
+Verify:
 
-1. A session starts.
-2. A user utterance is received.
-3. The workflow processes it.
-4. The mock tool executes.
-5. A response is generated.
-6. State is persisted.
-7. A follow-up turn uses prior state.
-8. Runtime evidence is produced for Novora.
+1. An organization creates a knowledge base.
+2. It configures a vector database connection.
+3. The connection is validated.
+4. A document is uploaded.
+5. The document is processed and indexed.
+6. A retrieval query returns the correct evidence.
+7. An agent uses the retrieved evidence.
+8. The evaluation engine receives the retrieval trace.
+9. A groundedness evaluation is produced.
+10. Another organization cannot access the knowledge base.
 
-Provide separate opt-in smoke tests that call the actual configured Hugging Face inference services.
+Also verify graph retrieval and hybrid retrieval with mock graph/vector adapters.
 
-Before live tests, clearly identify that they consume remote inference quota and may incur charges if the available free credits are exhausted.
+Test all four roles and cross-tenant access attempts.
 
-Do not claim live inference or browser voice functionality was tested unless it was actually verified.
+### Provider smoke tests
 
-## 13. Implementation order
+Provide opt-in tests for actual customer-configured databases.
 
-**Milestone 1 — Audit**
+Do not require provider credentials for the standard test suite.
 
-Inspect repositories, branches, contracts, and existing tests. Preserve user work.
+Clearly distinguish mocked tests from live provider tests.
 
-**Milestone 2 — Runtime**
+## 15. Implementation milestones
 
-Implement Voxia's session model, LangGraph workflow, tool interfaces, and persistence. Verify multi-turn behavior with deterministic tests.
+**Milestone 1 — Architecture and security audit**
 
-**Milestone 3 — Hugging Face inference adapters**
+Inspect existing models, connectors, authentication, and frontend. Establish the organization and tenant ownership strategy.
 
-Implement remote STT, LLM, and TTS using verified model/provider combinations. Keep all model inference remote.
+**Milestone 2 — RBAC foundation**
 
-**Milestone 4 — Browser voice**
+Implement organization membership, roles, centralized permission checks, tenant isolation, and migrations.
 
-Connect browser audio, Pipecat, Voxia, remote inference, and playback. Handle errors and interrupted sessions.
+**Milestone 3 — Knowledge Base and connection management**
 
-**Milestone 5 — Novora evaluation**
+Implement knowledge base CRUD, customer-owned vector and graph connections, secure credential storage, and connection validation.
 
-Connect runtime evidence to the existing Novora evaluation workflow using verified API contracts.
+**Milestone 4 — Document ingestion**
 
-**Milestone 6 — Verification**
+Implement parsing, chunking, embeddings, indexing, job status, and document management.
 
-Run automated tests, perform opt-in remote inference checks when authorized and configured, and document actual results.
+**Milestone 5 — Retrieval**
 
-Keep the application runnable after each milestone.
+Implement provider-neutral vector retrieval, graph retrieval, and hybrid retrieval.
 
-## 14. Definition of done
+**Milestone 6 — Agent integration**
 
-- [x] The runtime runs locally without hosting costs.
-- [x] No AI models run locally.
-- [x] STT uses a verified remote Hugging Face Inference Provider.
-- [x] The LLM uses a verified remote Hugging Face Inference Provider.
-- [x] TTS uses a verified remote Hugging Face Inference Provider.
-- [x] The Hugging Face token stays on the backend.
-- [x] The browser can capture speech and play generated audio.
-- [x] LangGraph maintains state across multiple turns.
-- [x] A mock business tool executes and returns a real fixture result.
-- [x] Tool execution evidence is captured accurately.
-- [x] Novora integration uses verified contracts and preserves existing functionality.
-- [x] Default automated tests do not consume inference credits.
-- [x] Live inference checks are opt-in and clearly identified.
-- [x] Quota exhaustion and provider errors are handled safely.
-- [x] Documentation explains setup, configuration, usage, and limitations.
-- [x] No unrelated frontend redesign or destructive Git operation occurs.
+Connect knowledge bases to existing agents and make retrieval available during agent execution.
 
-## 15. Final report
+**Milestone 7 — Knowledge-grounded evaluation**
 
-Report:
+Extend Novora's existing evaluation engine with retrieval evidence, groundedness checks, and source verification.
 
-1. Repositories and branches modified.
-2. Architecture implemented.
-3. Files created or modified.
-4. Exact model IDs and Inference Providers configured for STT, LLM, and TTS.
-5. Evidence that each model/provider combination supports the required task.
-6. Required environment variables.
-7. Local startup and test commands.
-8. Actual test results.
-9. Whether real remote inference was verified.
-10. Whether browser speech-to-speech was verified end-to-end.
-11. Whether Novora evaluation was verified end-to-end.
-12. Known limitations, quota considerations, and the next recommended step.
+**Milestone 8 — Frontend**
 
-Never fabricate successful requests, free-tier guarantees, model compatibility, evaluation results, or completed integrations.
+Extend the existing Knowledge Base, agent configuration, and organization settings pages without redesigning unrelated UI.
 
-**Final instruction:** Build a functioning browser-based Voxia runtime with remote Hugging Face inference only. Do not download or run AI models locally. Prioritize a complete, verifiable end-to-end workflow while preserving the existing Novora system.
+**Milestone 9 — Testing and documentation**
+
+Run tests, verify tenant isolation, validate integrations, and document the implementation.
+
+Keep the application runnable throughout implementation.
+
+## 16. Definition of done
+
+- [ ] Organizations can manage their own knowledge bases.
+- [ ] Customers can connect Chroma, Pinecone, Weaviate, and Qdrant through provider adapters.
+- [ ] Customers can connect Neo4j through a graph adapter.
+- [ ] Vector and graph providers are independent.
+- [ ] Documents can be uploaded, parsed, chunked, embedded, and indexed.
+- [ ] Customers can manage document ingestion and indexing.
+- [ ] Agents can access authorized knowledge bases.
+- [ ] Vector retrieval works.
+- [ ] Graph retrieval works where configured.
+- [ ] Hybrid retrieval works when both sources are available.
+- [ ] Retrieved sources are preserved as execution evidence.
+- [ ] Novora can evaluate retrieval quality and answer groundedness.
+- [ ] Organization-level RBAC is enforced by the backend.
+- [ ] Cross-organization access is prevented.
+- [ ] Credentials are encrypted.
+- [ ] Existing provider evaluation functionality remains intact.
+- [ ] Existing frontend design is preserved.
+- [ ] Automated tests pass.
+- [ ] Documentation explains configuration, permissions, ingestion, retrieval, and provider requirements.
+
+## 17. Final implementation report
+
+Provide:
+
+1. Repository and branch modified.
+2. Existing architecture discovered.
+3. Database migrations introduced.
+4. Models and API routes implemented.
+5. Vector and graph adapters implemented.
+6. Document ingestion pipeline details.
+7. Retrieval and hybrid RAG implementation.
+8. Agent integration details.
+9. Knowledge-grounded evaluation implementation.
+10. RBAC roles and permissions.
+11. Security controls.
+12. Frontend changes.
+13. Tests run and actual results.
+14. Provider integrations verified against real services.
+15. Remaining limitations and next steps.
+
+Do not claim that an adapter is production-verified merely because its interface or mocked tests exist.
+
+**Final instruction:** Implement a real multi-tenant Knowledge Base infrastructure for Novora, not just a document upload page. Customers own their databases, Novora connects to them, agents retrieve from them, and Novora evaluates whether those agents use the knowledge correctly.

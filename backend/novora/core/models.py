@@ -177,3 +177,74 @@ class RegressionReport(BaseModel):
     rule_comparisons: List[RuleComparison] = Field(default_factory=list)
     summary: str
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class Organization(BaseModel):
+    id: str = Field(default_factory=lambda: f"org_{uuid4().hex[:8]}")
+    name: str = Field(min_length=1)
+    slug: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class OrganizationMembership(BaseModel):
+    id: str = Field(default_factory=lambda: f"mem_{uuid4().hex[:8]}")
+    org_id: str
+    user_id: str
+    role: str = "member"  # owner, admin, member, viewer
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeBase(BaseModel):
+    id: str = Field(default_factory=lambda: f"kb_{uuid4().hex[:8]}")
+    org_id: str
+    name: str = Field(min_length=1)
+    description: Optional[str] = None
+    vector_provider: str = "chroma"  # chroma, pinecone, weaviate, qdrant
+    vector_config: Dict[str, Any] = Field(default_factory=dict)
+    graph_provider: Optional[str] = None  # neo4j
+    graph_config: Optional[Dict[str, Any]] = None
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    collection_name: str = "default"
+    namespace: Optional[str] = None
+    status: str = "active"
+    document_count: int = 0
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class KnowledgeDocument(BaseModel):
+    id: str = Field(default_factory=lambda: f"doc_{uuid4().hex[:8]}")
+    org_id: str
+    knowledge_base_id: str
+    filename: str
+    mime_type: str = "text/plain"
+    file_size: int = 0
+    content_hash: str = ""
+    status: str = "indexed"  # pending, processing, indexed, failed
+    chunk_count: int = 0
+    storage_path: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class RetrievalEvidence(BaseModel):
+    document_id: str
+    chunk_id: str
+    text: str
+    score: float = 0.0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    source: str = "vector"  # vector, graph, hybrid
+
+
+class RetrievalTrace(BaseModel):
+    id: str = Field(default_factory=lambda: f"trace_{uuid4().hex[:8]}")
+    query: str
+    org_id: str
+    knowledge_base_ids: List[str] = Field(default_factory=list)
+    retrieval_mode: str = "vector"  # vector, graph, hybrid
+    evidence: List[RetrievalEvidence] = Field(default_factory=list)
+    graph_entities: List[Dict[str, Any]] = Field(default_factory=list)
+    graph_relationships: List[Dict[str, Any]] = Field(default_factory=list)
+    latency_ms: float = 0.0
+    created_at: datetime = Field(default_factory=utc_now)

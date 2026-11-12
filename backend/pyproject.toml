@@ -20,7 +20,10 @@ dependencies = [
     "SQLAlchemy>=2.0.0",
     "psycopg[binary]>=3.1.0",
     "cryptography>=3.4.0",
-    "websockets==17.2"
+    "websockets==17.2",
+    "langgraph>=1.2.0",
+    "pipecat-ai>=1.0.0",
+    "pypdf>=5.0.0"
 ]
 
 [project.optional-dependencies]

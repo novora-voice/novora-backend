@@ -20,6 +20,10 @@ class ConfiguredAgentPayload(BaseModel):
     agent_id_ref: Optional[str] = None
     system_prompt: Optional[str] = None
     tools: List[str] = Field(default_factory=list)
+    knowledge_base_ids: List[str] = Field(default_factory=list)
+    retrieval_mode: str = "vector"  # vector, graph, hybrid
+    retrieval_top_k: int = 5
+    org_id: Optional[str] = None
     execution_mode: str = "sandbox"
     created_at: Optional[datetime] = None
     last_activity_at: Optional[datetime] = None

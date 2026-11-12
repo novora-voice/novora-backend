@@ -15,6 +15,7 @@ This repository contains the FastAPI backend. The dashboard is maintained separa
 ## Contents
 
 - [What Works Today](#what-works-today)
+- [Recent Additions: Voxia and Remote Provider Evaluation](#recent-additions-voxia-and-remote-provider-evaluation)
 - [System Architecture](#system-architecture)
 - [Evaluation Lifecycle](#evaluation-lifecycle)
 - [Ghost-Caller Execution Pipeline](#ghost-caller-execution-pipeline)
@@ -68,6 +69,30 @@ See [frontend/README.md](frontend/README.md) for dashboard capabilities and loca
 
 ---
 
+## Recent Additions: Voxia and Remote Provider Evaluation
+
+The project now includes a managed Voxia voice-runtime workflow alongside the existing evaluation of external voice-agent providers.
+
+### Frontend
+
+- Added a Voxia runtime view for selecting a scenario and agent, starting and ending sessions, and interacting by text or recorded microphone audio.
+- Displays the active session transcript and turn status, plays synthesized audio responses, and exposes the configured remote inference models.
+- Saves ended Voxia sessions as Novora conversations and offers a direct path to evaluate them with a selected scenario.
+- Keeps the Hugging Face inference credential on the backend; the browser sends audio and turns to Novora's API rather than calling Hugging Face directly.
+
+### Backend
+
+- Added Voxia session, turn, event, and tool-call models with session lifecycle and status endpoints.
+- Added remote Hugging Face inference adapters for speech-to-text, language generation, and text-to-speech. Model IDs and providers can be configured through backend environment variables; the runtime does not load AI models locally.
+- Added LangGraph stateful conversation handling and a Pipecat audio-turn pipeline. Text turns use the workflow directly; submitted audio is processed through the audio pipeline before reaching the workflow.
+- Added authorized business-tool execution and event logging, plus a bridge that converts completed Voxia sessions into Novora conversations for the existing evidence-based evaluation flow.
+- Expanded provider evaluation metadata to describe each provider's supported capabilities, configuration requirements, input and event types, execution modes, ghost-caller support, and whether an operation may incur real-world cost.
+- Added Hugging Face-backed evaluation and payload-generation support while keeping deterministic rules as the primary source of explainable verdicts.
+
+Voxia's active sessions are currently held in process memory, so they are not durable across backend restarts or shared across multiple backend instances. Saving an ended session as a Novora conversation makes it available to the existing evaluation and persistence flow. Knowledge-base retrieval and organization-level access controls remain planned work.
+
+---
+
 ## System Architecture
 
 Novora separates the operator interface, API layer, background processing, provider execution, and evaluation logic.
@@ -106,11 +131,12 @@ flowchart TD
 
 | Component | Responsibility |
 |---|---|
-| Next.js dashboard | Agent and scenario configuration, evaluation controls, run inspection, and regression comparison |
+| Next.js dashboard | Agent and scenario configuration, Voxia voice sessions, evaluation controls, run inspection, and regression comparison |
 | FastAPI API | Request validation, application logic, job creation, result retrieval, and provider-facing endpoints |
 | PostgreSQL | Durable application records, evaluation reports, and persistent job state |
 | Redis / Render Key Value | Queue transport and worker coordination |
 | ARQ worker | Executes queued evaluation jobs |
+| Voxia runtime | Runs managed text/audio sessions using remote Hugging Face inference, LangGraph workflow state, and Pipecat audio processing |
 | Ghost caller | Executes the configured scripted provider session through the evaluation pipeline |
 | Provider adapters | Handle provider-specific requests, events, and session behavior |
 | Conversation normalization | Converts provider conversation data into a consistent evaluation representation |

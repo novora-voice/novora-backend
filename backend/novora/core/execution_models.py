@@ -25,6 +25,9 @@ class AgentConfig(BaseModel):
     name: str
     system_prompt: Optional[str] = None
     permitted_tools: List[str] = Field(default_factory=list)
+    knowledge_base_ids: List[str] = Field(default_factory=list)
+    retrieval_mode: str = "vector"
+    retrieval_top_k: int = 5
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
 
