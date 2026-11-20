@@ -267,6 +267,19 @@ def update_member_role(
             detail="Only an Owner can transfer ownership or modify an Owner's role.",
         )
 
+    if (
+        target_membership.role == OrgRole.OWNER.value
+        and req.role != OrgRole.OWNER.value
+        and db.query(DBOrganizationMembership)
+        .filter(
+            DBOrganizationMembership.org_id == org_id,
+            DBOrganizationMembership.role == OrgRole.OWNER.value,
+            DBOrganizationMembership.user_id != user_id,
+        )
+        .count() == 0
+    ):
+        raise HTTPException(status_code=400, detail="An organization must retain at least one Owner.")
+
     target_membership.role = req.role.lower()
     db.commit()
     db.refresh(target_membership)
@@ -304,6 +317,15 @@ def remove_organization_member(
     # Cannot remove an OWNER unless caller is also OWNER and there's another OWNER
     if target_membership.role == OrgRole.OWNER.value and not is_self:
         raise HTTPException(status_code=403, detail="Cannot remove an Owner.")
+
+    if target_membership.role == OrgRole.OWNER.value and is_self:
+        other_owners = db.query(DBOrganizationMembership).filter(
+            DBOrganizationMembership.org_id == org_id,
+            DBOrganizationMembership.role == OrgRole.OWNER.value,
+            DBOrganizationMembership.user_id != user_id,
+        ).count()
+        if other_owners == 0:
+            raise HTTPException(status_code=400, detail="Transfer ownership before leaving this organization.")
 
     db.delete(target_membership)
     db.commit()
