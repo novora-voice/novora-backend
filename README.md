@@ -60,13 +60,14 @@ The planned walkthrough will demonstrate:
 ## 3. Screenshots
 
 | Interface | Screenshot |
-|---|---|
-| Authentication page | `docs/images/authentication.png` |
-| Evaluation dashboard | `docs/images/novora-dashboard.png` |
-| Provider configuration | `docs/images/novora-agent-configuration.png` |
-| Evaluation results | `docs/images/evaluations.png` |
-| Settings Configuration | `docs/images/settings.png` |
-| Voxia Runtime | `docs/images/voxia.png` |
+| :--- | :--- |
+| **Authentication page** | ![Authentication page](docs/images/authentication.png) |
+| **Evaluation dashboard** | ![Evaluation dashboard](docs/images/novora-dashboard.png) |
+| **Provider configuration** | ![Provider configuration](docs/images/novora-agent-configuration.png) |
+| **Evaluation results** | ![Evaluation results](docs/images/evaluations.png) |
+| **Settings Configuration** | ![Settings Configuration](docs/images/settings.png) |
+| **Voxia Runtime** | ![Voxia Runtime](docs/images/voxia.png) |
+
 
 ## 4. Key Capabilities
 
