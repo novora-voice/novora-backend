@@ -1,6 +1,6 @@
 # Novora Voice Agent Creation & Evaluation Platform
 
-## Test voice agents before their failures reach real customers.**
+### Test voice agents before their failures reach real customers.
 
 Novora is a voice AI evaluation platform designed to create, test, measure, and validate conversational voice agents across different providers.
 
@@ -59,17 +59,14 @@ The planned walkthrough will demonstrate:
 
 ## 3. Screenshots
 
-Add actual application screenshots to the following locations:
-
 | Interface | Screenshot |
 |---|---|
-| Evaluation dashboard | `docs/images/dashboard.png` |
-| Provider configuration | `docs/images/provider-configuration.png` |
-| Test scenario builder | `docs/images/test-scenario.png` |
-| Ghost caller interface | `docs/images/ghost-caller.png` |
-| Conversation transcript | `docs/images/transcript.png` |
-| Evaluation results | `docs/images/evaluation-results.png` |
-| Regression history | `docs/images/regression-history.png` |
+| Authentication page | `docs/images/authentication.png` |
+| Evaluation dashboard | `docs/images/novora-dashboard.png` |
+| Provider configuration | `docs/images/novora-agent-configuration.png` |
+| Evaluation results | `docs/images/evaluations.png` |
+| Settings Configuration | `docs/images/settings.png` |
+| Voxia Runtime | `docs/images/voxia.png` |
 
 ## 4. Key Capabilities
 
