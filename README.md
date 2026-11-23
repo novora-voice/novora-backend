@@ -1,11 +1,8 @@
-Novora
-Voice Agent Evaluation Platform · AI systems · Voice infrastructure
-:::writing{variant="document" id="73102"}
-# Novora — Voice Agent Evaluation Platform
+# Novora Voice Agent Creation & Evaluation Platform
 
-**Test voice agents before their failures reach real customers.**
+## Test voice agents before their failures reach real customers.**
 
-Novora is a voice AI evaluation platform designed to test, measure, and validate conversational voice agents across different providers.
+Novora is a voice AI evaluation platform designed to create, test, measure, and validate conversational voice agents across different providers.
 
 It focuses on a problem that becomes increasingly important as voice agents move into production: a conversation can sound convincing while still failing to complete the task it was designed to perform.
 
