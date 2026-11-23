@@ -1,15 +1,199 @@
-# Novora — Voice AI Evaluation & Regression Monitoring
+Novora
+Voice Agent Evaluation Platform · AI systems · Voice infrastructure
+:::writing{variant="document" id="73102"}
+# Novora — Voice Agent Evaluation Platform
 
-Novora is a platform for testing conversational voice agents against business workflows and policy. It runs scripted calls against supported voice-agent providers, evaluates the resulting conversations, and preserves the evidence behind each result so teams can inspect failures and compare runs over time.
+**Test voice agents before their failures reach real customers.**
 
-Rather than judging an agent solely by how fluent it sounds, Novora evaluates whether its behavior satisfies defined business requirements. Teams can configure scenarios and evaluation rules, execute tests, inspect transcript evidence, and investigate regressions between runs.
+Novora is a voice AI evaluation platform designed to test, measure, and validate conversational voice agents across different providers.
 
-This repository contains the FastAPI backend. The dashboard is maintained separately and provides the operator interface for configuring agents, creating scenarios, inspecting evaluations, and comparing results.
+It focuses on a problem that becomes increasingly important as voice agents move into production: a conversation can sound convincing while still failing to complete the task it was designed to perform.
 
-**Backend API:** [Novora Backend](https://novora-backend-616w.onrender.com)
+Novora evaluates more than conversational quality. It checks whether agents follow workflows, collect the correct information, respect constraints, invoke tools appropriately, and avoid prohibited claims.
 
-**Frontend documentation:** [Frontend README](frontend/README.md)
+- **Backend:** [GitHub Repository](https://github.com/novora-voice/novora-backend)
+- **Frontend:** [GitHub Repository](https://github.com/novora-voice/novora-frontend)
+- **Project organization:** [Novora Voice](https://github.com/novora-voice)
+- **Live Demo:** [Novora Web App](https://novora-voice.github.io/novora-frontend)
 
+---
+
+## 1. Project Introduction
+
+### The problem
+
+Traditional voice agent testing often relies on manually calling an agent, listening to recordings, and deciding whether the conversation was successful.
+
+This approach becomes difficult to scale.
+
+A voice agent may:
+- Sound natural but collect incorrect information.
+- Fail to follow a required workflow.
+- Ignore numerical limits or business rules.
+- Invoke the wrong tool.
+- Make unsupported promises.
+- Behave differently after a prompt or model change.
+
+Conversation quality alone is not sufficient to establish reliability.
+
+### The solution
+
+Novora provides a structured evaluation environment for testing voice agents using simulated calls, deterministic checks, and LLM-assisted assessment.
+
+The platform is designed to make voice agent behavior measurable and repeatable across providers such as Vapi, Retell, and custom voice pipelines.
+
+Its core philosophy is:
+
+**A successful voice interaction must satisfy the task's requirements, not simply sound human.**
+
+## 2. Video Demonstration
+
+**[Video demonstration coming soon]**
+
+The planned walkthrough will demonstrate:
+
+1. Selecting a voice agent provider.
+2. Configuring an evaluation scenario.
+3. Initiating a simulated call using a ghost caller.
+4. Capturing the conversation and execution evidence.
+5. Running deterministic assertions.
+6. Reviewing LLM-assisted evaluation results.
+7. Comparing results across test runs.
+
+## 3. Screenshots
+
+Add actual application screenshots to the following locations:
+
+| Interface | Screenshot |
+|---|---|
+| Evaluation dashboard | `docs/images/dashboard.png` |
+| Provider configuration | `docs/images/provider-configuration.png` |
+| Test scenario builder | `docs/images/test-scenario.png` |
+| Ghost caller interface | `docs/images/ghost-caller.png` |
+| Conversation transcript | `docs/images/transcript.png` |
+| Evaluation results | `docs/images/evaluation-results.png` |
+| Regression history | `docs/images/regression-history.png` |
+
+## 4. Key Capabilities
+
+### Multi-provider voice agent testing
+
+Evaluate voice agents across different providers and infrastructure.
+
+The integration targets include:
+- Vapi
+- Retell
+- ElevenLabs
+- AssemblyAI
+- Twilio
+
+### Simulated conversations
+
+Use a ghost-caller approach to simulate conversations and test how an agent responds to different scenarios.
+
+This makes it possible to evaluate behavior without depending entirely on manual calls.
+
+### Deterministic evaluation
+
+Validate requirements that should not be left to subjective model judgment.
+
+Examples include:
+- Whether required information was collected.
+- Whether a workflow was completed.
+- Whether numerical constraints were respected.
+- Whether required tools were invoked.
+- Whether prohibited claims were made.
+
+### LLM-assisted evaluation
+
+Use an LLM-as-judge approach to assess qualitative aspects of conversations that are harder to express as simple assertions.
+
+### Evidence-based reporting
+
+Keep evaluation results connected to the underlying conversation, transcript, and execution evidence.
+
+### Regression testing
+
+Repeat scenarios to identify behavioral changes following prompt, configuration, or model updates.
+
+## 5. How It Works
+
+```mermaid
+flowchart TD
+    A[Configure Voice Agent] --> B[Select Provider]
+    B --> C[Define Test Scenario]
+    C --> D[Start Ghost Caller]
+    D --> E[Voice Agent Conversation]
+    E --> F[Capture Audio and Transcript]
+    F --> G[Collect Execution Evidence]
+    G --> H[Deterministic Evaluation]
+    G --> I[LLM-as-Judge Evaluation]
+    H --> J[Combine Evaluation Results]
+    I --> J
+    J --> K[Generate Evaluation Report]
+    K --> L[Compare Regression Runs]
+```
+
+## 6. Architecture
+
+Novora combines a voice interaction runtime with an evaluation and orchestration layer.
+
+```mermaid
+flowchart TB
+    USER[Evaluator] --> FE[Next.js Dashboard]
+    FE --> API[FastAPI Backend]
+
+    API --> DB[(PostgreSQL)]
+    API --> REDIS[(Redis)]
+    API --> QUEUE[ARQ Workers]
+
+    QUEUE --> ORCH[LangGraph Orchestration]
+
+    ORCH --> CALLER[Ghost Caller]
+    CALLER --> VOICE[Pipecat Voice Runtime]
+
+    VOICE --> STT[Speech-to-Text]
+    VOICE --> LLM[Conversation Model]
+    VOICE --> TTS[Text-to-Speech]
+
+    VOICE --> PROVIDERS[External Voice Providers]
+    ORCH --> EVAL[Evaluation Engine]
+
+    EVAL --> RULES[Deterministic Assertions]
+    EVAL --> JUDGE[LLM-as-Judge]
+
+    RULES --> RESULTS[Evaluation Evidence]
+    JUDGE --> RESULTS
+    RESULTS --> DB
+    RESULTS --> DASH[Results Dashboard]
+```
+
+### Architectural decisions
+
+- **Pipecat:** Provides the real-time voice pipeline foundation.
+- **LangGraph:** Orchestrates evaluation workflows and stateful execution.
+- **FastAPI:** Exposes backend services and evaluation APIs.
+- **PostgreSQL:** Persists evaluation data and application state.
+- **Redis and ARQ:** Support asynchronous execution.
+- **Deterministic assertions:** Validate business and workflow requirements.
+- **LLM-as-judge:** Evaluates qualitative conversation characteristics.
+
+The important distinction is between subjective conversational assessment and objective task validation. Novora uses both rather than treating them as interchangeable.
+
+## 7. Technology Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | Next.js, React, TypeScript |
+| Backend | Python, FastAPI |
+| Voice runtime | Pipecat |
+| Orchestration | LangGraph |
+| Database | PostgreSQL |
+| Background jobs | Redis, ARQ |
+| Voice integrations | Vapi, Retell, ElevenLabs |
+| Speech infrastructure | AssemblyAI, Twilio |
+| Evaluation | Deterministic assertions, LLM-as-judge |
+| Testing | pytest, GitHub Actions |
 ---
 
 ## Contents
