@@ -39,6 +39,53 @@ def _create_user(client: TestClient, email: str, name: str) -> tuple[str, str]:
 
 
 class TestKnowledgeAndOrgAPI:
+    def test_organization_roles_and_owner_retention(self, api_client):
+        owner_id, owner_token = _create_user(api_client, "rbac-owner@acme.com", "RBAC Owner")
+        viewer_id, viewer_token = _create_user(api_client, "rbac-viewer@acme.com", "RBAC Viewer")
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        viewer_headers = {"Authorization": f"Bearer {viewer_token}"}
+
+        org = api_client.post(
+            "/api/v1/organizations", json={"name": "RBAC Org"}, headers=owner_headers
+        ).json()
+        org_id = org["id"]
+        add_member = api_client.post(
+            f"/api/v1/organizations/{org_id}/members",
+            json={"email": "rbac-viewer@acme.com", "role": "viewer"},
+            headers=owner_headers,
+        )
+        assert add_member.status_code == 201
+        assert add_member.json()["role"] == "viewer"
+
+        # Viewers can inspect memberships but cannot manage members or create tenant resources.
+        assert api_client.get(
+            f"/api/v1/organizations/{org_id}/members", headers=viewer_headers
+        ).status_code == 200
+        denied_add = api_client.post(
+            f"/api/v1/organizations/{org_id}/members",
+            json={"email": "rbac-owner@acme.com", "role": "member"},
+            headers=viewer_headers,
+        )
+        assert denied_add.status_code == 403
+        denied_kb = api_client.post(
+            "/api/v1/knowledge-bases",
+            json={"org_id": org_id, "name": "Forbidden", "vector_provider": "chroma"},
+            headers=viewer_headers,
+        )
+        assert denied_kb.status_code == 403
+
+        # The last Owner cannot demote or remove themselves and strand the organization.
+        demote_owner = api_client.patch(
+            f"/api/v1/organizations/{org_id}/members/{owner_id}",
+            json={"role": "admin"},
+            headers=owner_headers,
+        )
+        assert demote_owner.status_code == 400
+        remove_owner = api_client.delete(
+            f"/api/v1/organizations/{org_id}/members/{owner_id}", headers=owner_headers
+        )
+        assert remove_owner.status_code == 400
+
     def test_full_lifecycle_and_tenant_isolation(self, api_client):
         # 1. Create two users in different organizations
         user_a_id, token_a = _create_user(api_client, "alice@acme.com", "Alice Owner")

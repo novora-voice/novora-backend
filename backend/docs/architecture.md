@@ -59,7 +59,7 @@ Novora follows a **modular monolith** design pattern with strict package separat
 | `novora.providers` | Capability protocols for voice-agent platforms, telephony, and transcription providers. | Claude A |
 | `novora.adapters` | Provider payload normalizers (ElevenLabs, Twilio, AssemblyAI, transcript import), storage repositories. | Claude A |
 | `novora.api` | FastAPI application, route controllers, schemas, webhooks, dependency injection. | Claude A |
-| `novora.voxia` | Managed voice sessions with a Pipecat audio-turn pipeline, stateful LangGraph workflow, remote Hugging Face STT/LLM/TTS adapters, authorized tools, and a bridge into Novora conversations. | Active; session state is currently in memory. |
+| `novora.voxia` | Managed voice sessions with a Pipecat audio-turn pipeline, continuous stateful conversation workflow (implemented with LangGraph), remote Hugging Face STT/LLM/TTS adapters, authorized tools, and a bridge into Novora conversations. | Active; session state is currently in memory. |
 
 ---
 
